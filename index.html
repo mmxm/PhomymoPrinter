@@ -554,34 +554,31 @@
         <h2>Format & Papier</h2>
         
         <div class="form-group">
-          <label for="selectPaperWidth">Largeur du rouleau</label>
-          <select id="selectPaperWidth">
-            <option value="53" selected>53 mm (Large)</option>
-            <option value="25">25 mm (Moyen)</option>
-            <option value="15">15 mm (Étroit)</option>
-          </select>
+          <label>Préréglages de papier</label>
+          <div id="paperPresetsList" style="display: flex; flex-direction: column; gap: 0.4rem; max-height: 150px; overflow-y: auto; margin-bottom: 0.75rem; background: var(--surface-card); padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border);">
+            <!-- Populated dynamically by JS -->
+          </div>
         </div>
 
         <div class="form-group">
           <label>Marges Physiques (G/D)</label>
-          <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
-            <button id="btnMarginOfficial" style="flex: 1; padding: 0.35rem; font-size: 0.75rem;">Papier Officiel</button>
-            <button id="btnMarginBorderless" style="flex: 1; padding: 0.35rem; font-size: 0.75rem;">Sans Marges</button>
-          </div>
           <div class="form-group" style="margin-bottom: 0.5rem;">
             <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.2rem;">
               <span>Gauche</span>
               <span id="lblMarginLeft">0 mm</span>
             </div>
-            <input type="range" id="inputMarginLeft" min="0" max="10" step="0.5" value="0">
+            <input type="range" id="inputMarginLeft" min="0" max="45" step="0.5" value="0">
           </div>
-          <div class="form-group">
+          <div class="form-group" style="margin-bottom: 0.5rem;">
             <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.2rem;">
               <span>Droite</span>
               <span id="lblMarginRight">3 mm</span>
             </div>
-            <input type="range" id="inputMarginRight" min="0" max="10" step="0.5" value="3">
+            <input type="range" id="inputMarginRight" min="0" max="45" step="0.5" value="3">
           </div>
+          <button id="btnSavePaperPreset" style="width: 100%; padding: 0.35rem; font-size: 0.75rem; justify-content: center; margin-top: 0.5rem;">
+            Sauvegarder comme préréglage
+          </button>
         </div>
 
         <div class="form-group">
@@ -861,7 +858,7 @@
 
   <script>
     // Constants & Configuration
-    const APP_VERSION = 'v1.0.1';
+    const APP_VERSION = 'v1.0.2';
     const DPI = 300;
     const MM_TO_INCH = 25.4;
     const PIXEL_RATIO = DPI / MM_TO_INCH; // dots per mm (approx 11.81 dots/mm)
@@ -890,7 +887,7 @@
 
     // Document settings (pixel width/height dynamically computed)
     let settings = {
-      paperWidthMM: 53,
+      paperWidthMM: 52.8,
       marginLeftMM: 0,
       marginRightMM: 3,
       feedLengthMM: 15,
@@ -904,9 +901,8 @@
     const canvasWrapper = document.getElementById('canvasWrapper');
 
     // UI Controls
-    const selectPaperWidth = document.getElementById('selectPaperWidth');
-    const btnMarginOfficial = document.getElementById('btnMarginOfficial');
-    const btnMarginBorderless = document.getElementById('btnMarginBorderless');
+    const paperPresetsList = document.getElementById('paperPresetsList');
+    const btnSavePaperPreset = document.getElementById('btnSavePaperPreset');
     const inputMarginLeft = document.getElementById('inputMarginLeft');
     const inputMarginRight = document.getElementById('inputMarginRight');
     const lblMarginLeft = document.getElementById('lblMarginLeft');
@@ -1008,13 +1004,15 @@
           .catch(err => console.warn('Service Worker registration failed:', err));
       }
 
-      // 2. Load settings, draft and templates from localStorage
+      // 2. Load settings, draft, presets and templates from localStorage
       loadSettingsFromStorage();
+      loadPaperPresetsFromStorage();
       loadDraftFromStorage();
       loadTemplatesList();
 
       // 3. Init canvas layout and refresh UI
       updateCanvasSize();
+      renderPaperPresetsList();
       pushHistory();
       render();
 
@@ -1031,7 +1029,6 @@
           settings = { ...settings, ...loaded };
           
           // Apply to UI values
-          selectPaperWidth.value = settings.paperWidthMM;
           inputMarginLeft.value = settings.marginLeftMM;
           inputMarginRight.value = settings.marginRightMM;
           inputFeedLength.value = settings.feedLengthMM;
@@ -1054,6 +1051,118 @@
 
     function saveSettingsToStorage() {
       localStorage.setItem('sticker_printer_settings', JSON.stringify(settings));
+    }
+
+    const factoryPaperPresets = [
+      { name: "53 mm - Papier Officiel", marginLeftMM: 0.0, marginRightMM: 3.0, feedLengthMM: 15.0 },
+      { name: "53 mm - Sans Marges", marginLeftMM: 0.0, marginRightMM: 0.0, feedLengthMM: 15.0 },
+      { name: "25 mm - Centré", marginLeftMM: 14.0, marginRightMM: 14.0, feedLengthMM: 15.0 },
+      { name: "15 mm - Centré", marginLeftMM: 19.0, marginRightMM: 19.0, feedLengthMM: 15.0 }
+    ];
+
+    function renderPaperPresetsList() {
+      if (!paperPresetsList) return;
+      paperPresetsList.innerHTML = '';
+
+      // Render factory presets
+      factoryPaperPresets.forEach(preset => {
+        const item = document.createElement('div');
+        item.className = 'preset-item';
+        item.style = 'display: flex; justify-content: space-between; align-items: center; padding: 0.25rem 0.4rem; font-size: 0.75rem; border-radius: 4px; cursor: pointer; background: var(--surface-bg); border: 1px solid var(--border);';
+        
+        const isActive = parseFloat(settings.marginLeftMM) === preset.marginLeftMM &&
+                         parseFloat(settings.marginRightMM) === preset.marginRightMM &&
+                         parseFloat(settings.feedLengthMM) === preset.feedLengthMM;
+                         
+        if (isActive) {
+          item.style.borderColor = 'var(--accent)';
+          item.style.background = 'var(--accent-dim)';
+        }
+
+        item.innerHTML = `
+          <span style="font-weight: 500;">${preset.name}</span>
+          <span style="color: var(--text-secondary); font-size: 0.65rem;">G:${preset.marginLeftMM} D:${preset.marginRightMM}</span>
+        `;
+        
+        item.addEventListener('click', () => {
+          applyPaperPreset(preset);
+        });
+        paperPresetsList.appendChild(item);
+      });
+
+      // Render custom presets
+      customPaperPresets.forEach((preset, index) => {
+        const item = document.createElement('div');
+        item.className = 'preset-item';
+        item.style = 'display: flex; justify-content: space-between; align-items: center; padding: 0.25rem 0.4rem; font-size: 0.75rem; border-radius: 4px; cursor: pointer; background: var(--surface-bg); border: 1px solid var(--border);';
+        
+        const isActive = parseFloat(settings.marginLeftMM) === preset.marginLeftMM &&
+                         parseFloat(settings.marginRightMM) === preset.marginRightMM &&
+                         parseFloat(settings.feedLengthMM) === preset.feedLengthMM;
+
+        if (isActive) {
+          item.style.borderColor = 'var(--accent)';
+          item.style.background = 'var(--accent-dim)';
+        }
+
+        item.innerHTML = `
+          <div style="display: flex; flex-direction: column; gap: 0.1rem; flex: 1;">
+            <span style="font-weight: 500;">${preset.name}</span>
+            <span style="color: var(--text-secondary); font-size: 0.65rem;">G:${preset.marginLeftMM} D:${preset.marginRightMM}</span>
+          </div>
+          <button class="delete-preset-btn" style="background: transparent; border: none; padding: 0.2rem; cursor: pointer; color: var(--danger); font-size: 0.85rem;" title="Supprimer">✕</button>
+        `;
+
+        item.addEventListener('click', (e) => {
+          if (e.target.classList.contains('delete-preset-btn')) {
+            e.stopPropagation();
+            deletePaperPreset(index);
+          } else {
+            applyPaperPreset(preset);
+          }
+        });
+        
+        paperPresetsList.appendChild(item);
+      });
+    }
+
+    function applyPaperPreset(preset) {
+      settings.marginLeftMM = preset.marginLeftMM;
+      settings.marginRightMM = preset.marginRightMM;
+      settings.feedLengthMM = preset.feedLengthMM;
+
+      // Update Sliders and inputs in UI
+      inputMarginLeft.value = settings.marginLeftMM;
+      inputMarginRight.value = settings.marginRightMM;
+      inputFeedLength.value = settings.feedLengthMM;
+
+      saveSettingsToStorage();
+      updateCanvasSize();
+      render();
+      renderPaperPresetsList();
+    }
+
+    function deletePaperPreset(index) {
+      if (confirm(`Voulez-vous supprimer le préréglage "${customPaperPresets[index].name}" ?`)) {
+        customPaperPresets.splice(index, 1);
+        savePaperPresetsToStorage();
+        renderPaperPresetsList();
+      }
+    }
+
+    function savePaperPresetsToStorage() {
+      localStorage.setItem('sticker_printer_paper_presets', JSON.stringify(customPaperPresets));
+    }
+
+    function loadPaperPresetsFromStorage() {
+      const stored = localStorage.getItem('sticker_printer_paper_presets');
+      if (stored) {
+        try {
+          customPaperPresets = JSON.parse(stored);
+        } catch(e) {
+          console.error("Erreur de chargement des préréglages personnalisés", e);
+        }
+      }
     }
 
     function saveDraftToStorage() {
@@ -1114,14 +1223,15 @@
         localStorage.removeItem('sticker_printer_settings');
         localStorage.removeItem('sticker_printer_draft_elements');
         localStorage.removeItem('phomemo_saved_templates');
+        localStorage.removeItem('sticker_printer_paper_presets');
         window.location.reload();
       }
     }
 
     // Dynamic Canvas Resizing based on settings
     function updateCanvasSize() {
-      const paperWidthMM = parseFloat(settings.paperWidthMM);
-      const totalWidthPx = Math.round(paperWidthMM * PIXEL_RATIO);
+      // Physical head width in dots = 624
+      const totalWidthPx = 624;
       
       // Calculate printable area
       const leftMarginPx = Math.round(parseFloat(settings.marginLeftMM) * PIXEL_RATIO);
@@ -1131,9 +1241,14 @@
       let printableWidthPx = totalWidthPx - (leftMarginPx + rightMarginPx);
       printableWidthPx = Math.max(8, Math.floor(printableWidthPx / 8) * 8); // Align to byte boundary
       
-      // Compute total width based on margins and printable bytes
-      // To keep visual representation accurate:
-      canvas.width = printableWidthPx + leftMarginPx + rightMarginPx;
+      // Re-align right margin to match exactly
+      const actualRightMarginPx = totalWidthPx - leftMarginPx - printableWidthPx;
+      
+      canvas.width = totalWidthPx;
+      
+      // Update UI labels if elements exist
+      if (lblMarginLeft) lblMarginLeft.textContent = parseFloat(settings.marginLeftMM).toFixed(1) + ' mm';
+      if (lblMarginRight) lblMarginRight.textContent = (actualRightMarginPx / PIXEL_RATIO).toFixed(1) + ' mm';
       
       // Height calculation
       if (settings.heightMode === 'fixed') {
@@ -1183,45 +1298,50 @@
         render();
       });
 
-      // Quick margins
-      btnMarginOfficial.addEventListener('click', () => {
-        settings.marginLeftMM = 0;
-        settings.marginRightMM = 3;
-        inputMarginLeft.value = 0;
-        inputMarginRight.value = 3;
-        lblMarginLeft.textContent = '0 mm';
-        lblMarginRight.textContent = '3 mm';
-        saveSettingsToStorage();
-        updateCanvasSize();
-        render();
-      });
-
-      btnMarginBorderless.addEventListener('click', () => {
-        settings.marginLeftMM = 0;
-        settings.marginRightMM = 0;
-        inputMarginLeft.value = 0;
-        inputMarginRight.value = 0;
-        lblMarginLeft.textContent = '0 mm';
-        lblMarginRight.textContent = '0 mm';
-        saveSettingsToStorage();
-        updateCanvasSize();
-        render();
+      // Save custom paper preset
+      btnSavePaperPreset.addEventListener('click', () => {
+        const name = prompt("Entrez le nom de votre préréglage de papier :", "Mon format");
+        if (name && name.trim()) {
+          const newPreset = {
+            name: name.trim(),
+            marginLeftMM: parseFloat(settings.marginLeftMM),
+            marginRightMM: parseFloat(settings.marginRightMM),
+            feedLengthMM: parseFloat(settings.feedLengthMM)
+          };
+          customPaperPresets.push(newPreset);
+          savePaperPresetsToStorage();
+          renderPaperPresetsList();
+        }
       });
 
       inputMarginLeft.addEventListener('input', (e) => {
-        settings.marginLeftMM = parseFloat(e.target.value);
-        lblMarginLeft.textContent = settings.marginLeftMM + ' mm';
+        let val = parseFloat(e.target.value) || 0;
+        const maxVal = 48 - parseFloat(settings.marginRightMM);
+        if (val > maxVal) {
+          val = maxVal;
+          e.target.value = val;
+        }
+        settings.marginLeftMM = val;
+        lblMarginLeft.textContent = settings.marginLeftMM.toFixed(1) + ' mm';
         saveSettingsToStorage();
         updateCanvasSize();
         render();
+        renderPaperPresetsList();
       });
 
       inputMarginRight.addEventListener('input', (e) => {
-        settings.marginRightMM = parseFloat(e.target.value);
-        lblMarginRight.textContent = settings.marginRightMM + ' mm';
+        let val = parseFloat(e.target.value) || 0;
+        const maxVal = 48 - parseFloat(settings.marginLeftMM);
+        if (val > maxVal) {
+          val = maxVal;
+          e.target.value = val;
+        }
+        settings.marginRightMM = val;
+        lblMarginRight.textContent = settings.marginRightMM.toFixed(1) + ' mm';
         saveSettingsToStorage();
         updateCanvasSize();
         render();
+        renderPaperPresetsList();
       });
 
       inputFeedLength.addEventListener('change', (e) => {
@@ -2380,7 +2500,8 @@
         marginRight: settings.marginRightMM,
         defaultFeed: settings.feedLengthMM,
         heightMode: settings.heightMode,
-        labelHeight: settings.labelHeightMM
+        labelHeight: settings.labelHeightMM,
+        customPaperPresets: customPaperPresets
       };
 
       const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
@@ -2409,9 +2530,12 @@
           if (config.defaultFeed !== undefined) settings.feedLengthMM = config.defaultFeed;
           if (config.heightMode !== undefined) settings.heightMode = config.heightMode;
           if (config.labelHeight !== undefined) settings.labelHeightMM = config.labelHeight;
+          if (config.customPaperPresets !== undefined && Array.isArray(config.customPaperPresets)) {
+            customPaperPresets = config.customPaperPresets;
+            savePaperPresetsToStorage();
+          }
 
           // Apply to GUI inputs
-          selectPaperWidth.value = settings.paperWidthMM;
           inputMarginLeft.value = settings.marginLeftMM;
           inputMarginRight.value = settings.marginRightMM;
           inputFeedLength.value = settings.feedLengthMM;
@@ -2430,6 +2554,7 @@
           saveSettingsToStorage();
           updateCanvasSize();
           render();
+          renderPaperPresetsList();
           alert("Configuration chargée avec succès !");
         } catch (err) {
           alert("Fichier de configuration invalide.");
@@ -2530,7 +2655,6 @@
 
       // Apply settings
       settings = { ...settings, ...t.settings };
-      selectPaperWidth.value = settings.paperWidthMM;
       inputMarginLeft.value = settings.marginLeftMM;
       inputMarginRight.value = settings.marginRightMM;
       inputFeedLength.value = settings.feedLengthMM;
