@@ -885,7 +885,7 @@
 
   <script>
     // Constants & Configuration
-    const APP_VERSION = 'v1.0.8';
+    const APP_VERSION = 'v1.0.9';
     const DPI = 300;
     const MM_TO_INCH = 25.4;
     const PIXEL_RATIO = DPI / MM_TO_INCH; // dots per mm (approx 11.81 dots/mm)
@@ -1657,7 +1657,7 @@
 
       // Global click-out deselection listener
       document.addEventListener('mousedown', (e) => {
-        if (e.target.closest('#canvasWrapper') || e.target.closest('#propertiesPanel') || e.target.closest('.sidebar') || e.target.closest('.toolbar') || e.target.closest('.modal')) {
+        if (e.target.closest('#canvasWrapper') || e.target.closest('.sidebar-left') || e.target.closest('.sidebar-right') || e.target.closest('.toolbar') || e.target.closest('.modal') || e.target.closest('.print-overlay')) {
           return;
         }
         if (selectedElementIndex !== -1) {
