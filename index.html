@@ -858,7 +858,7 @@
 
   <script>
     // Constants & Configuration
-    const APP_VERSION = 'v1.0.3';
+    const APP_VERSION = 'v1.0.4';
     const DPI = 300;
     const MM_TO_INCH = 25.4;
     const PIXEL_RATIO = DPI / MM_TO_INCH; // dots per mm (approx 11.81 dots/mm)
@@ -1278,27 +1278,6 @@
 
     // Set up event listeners for inputs
     function setupEventListeners() {
-      // Paper parameters change
-      selectPaperWidth.addEventListener('change', (e) => {
-        settings.paperWidthMM = parseInt(e.target.value);
-        // Set standard margins based on width
-        if (settings.paperWidthMM === 53) {
-          settings.marginLeftMM = 0;
-          settings.marginRightMM = 3;
-        } else {
-          settings.marginLeftMM = 0;
-          settings.marginRightMM = 0;
-        }
-        inputMarginLeft.value = settings.marginLeftMM;
-        inputMarginRight.value = settings.marginRightMM;
-        lblMarginLeft.textContent = settings.marginLeftMM + ' mm';
-        lblMarginRight.textContent = settings.marginRightMM + ' mm';
-        
-        saveSettingsToStorage();
-        updateCanvasSize();
-        render();
-      });
-
       // Save custom paper preset
       btnSavePaperPreset.addEventListener('click', () => {
         const name = prompt("Entrez le nom de votre préréglage de papier :", "Mon format");
