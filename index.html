@@ -914,7 +914,7 @@
 
   <script>
     // Constants & Configuration
-    const APP_VERSION = 'v1.0.11';
+    const APP_VERSION = 'v1.0.12';
     const DPI = 300;
     const MM_TO_INCH = 25.4;
     const PIXEL_RATIO = DPI / MM_TO_INCH; // dots per mm (approx 11.81 dots/mm)
@@ -1949,16 +1949,12 @@
       activeInlineElementIndex = index;
       el.isEditing = true;
 
-      const rect = canvas.getBoundingClientRect();
-      const left = rect.left + el.x * zoomLevel + window.scrollX;
-      const top = rect.top + el.y * zoomLevel + window.scrollY;
-
       const textarea = document.createElement('textarea');
       textarea.id = 'inlineTextEditor';
       
       textarea.style.position = 'absolute';
-      textarea.style.left = left + 'px';
-      textarea.style.top = top + 'px';
+      textarea.style.left = (el.x * zoomLevel) + 'px';
+      textarea.style.top = (el.y * zoomLevel) + 'px';
       textarea.style.width = (el.width * zoomLevel) + 'px';
       textarea.style.height = (el.height * zoomLevel) + 'px';
       
@@ -1985,7 +1981,7 @@
       textarea.style.transform = `rotate(${el.rotation || 0}deg)`;
 
       textarea.value = el.text;
-      document.body.appendChild(textarea);
+      canvasWrapper.appendChild(textarea);
       activeInlineTextarea = textarea;
 
       textarea.focus();
@@ -2020,10 +2016,9 @@
       el.text = activeInlineTextarea.value;
       el.isEditing = false;
 
-      document.body.removeChild(activeInlineTextarea);
+      canvasWrapper.removeChild(activeInlineTextarea);
       activeInlineTextarea = null;
       
-      const idx = activeInlineElementIndex;
       activeInlineElementIndex = -1;
 
       saveDraftToStorage();
@@ -2037,10 +2032,9 @@
     function updateInlineEditorStyle() {
       if (!activeInlineTextarea || activeInlineElementIndex === -1) return;
       const el = elements[activeInlineElementIndex];
-      const rect = canvas.getBoundingClientRect();
       
-      activeInlineTextarea.style.left = (rect.left + el.x * zoomLevel + window.scrollX) + 'px';
-      activeInlineTextarea.style.top = (rect.top + el.y * zoomLevel + window.scrollY) + 'px';
+      activeInlineTextarea.style.left = (el.x * zoomLevel) + 'px';
+      activeInlineTextarea.style.top = (el.y * zoomLevel) + 'px';
       activeInlineTextarea.style.width = (el.width * zoomLevel) + 'px';
       activeInlineTextarea.style.height = (el.height * zoomLevel) + 'px';
       
@@ -2053,13 +2047,7 @@
       activeInlineTextarea.style.transform = `rotate(${el.rotation || 0}deg)`;
     }
 
-    function repositionInlineEditor() {
-      if (!activeInlineTextarea || activeInlineElementIndex === -1) return;
-      const el = elements[activeInlineElementIndex];
-      const rect = canvas.getBoundingClientRect();
-      activeInlineTextarea.style.left = (rect.left + el.x * zoomLevel + window.scrollX) + 'px';
-      activeInlineTextarea.style.top = (rect.top + el.y * zoomLevel + window.scrollY) + 'px';
-    }
+    function repositionInlineEditor() {}
 
     function getLocalCoords(px, py, cx, cy, angleDegrees) {
       const angleRadians = (-angleDegrees * Math.PI) / 180;
