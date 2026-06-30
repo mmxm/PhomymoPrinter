@@ -561,23 +561,26 @@
         </div>
 
         <div class="form-group">
-          <label>Marges Physiques (G/D)</label>
+          <label>Zone d'impression physique</label>
           <div class="form-group" style="margin-bottom: 0.5rem;">
             <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.2rem;">
-              <span>Gauche</span>
-              <span id="lblMarginLeft">0 mm</span>
+              <span>Début de zone (G)</span>
+              <span id="lblStartMM">0.0 mm</span>
             </div>
-            <input type="range" id="inputMarginLeft" min="0" max="45" step="0.5" value="0">
+            <input type="range" id="inputStartByte" min="0" max="77" step="1" value="0">
           </div>
           <div class="form-group" style="margin-bottom: 0.5rem;">
             <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.2rem;">
-              <span>Droite</span>
-              <span id="lblMarginRight">3 mm</span>
+              <span>Fin de zone (D)</span>
+              <span id="lblEndMM">52.8 mm</span>
             </div>
-            <input type="range" id="inputMarginRight" min="0" max="45" step="0.5" value="3">
+            <input type="range" id="inputEndByte" min="1" max="78" step="1" value="78">
           </div>
           <button id="btnSavePaperPreset" style="width: 100%; padding: 0.35rem; font-size: 0.75rem; justify-content: center; margin-top: 0.5rem;">
             Sauvegarder comme préréglage
+          </button>
+          <button id="btnPrintTestPattern" class="secondary" style="width: 100%; padding: 0.35rem; font-size: 0.75rem; justify-content: center; margin-top: 0.4rem;">
+            Imprimer une mire de calibration
           </button>
         </div>
 
@@ -858,7 +861,7 @@
 
   <script>
     // Constants & Configuration
-    const APP_VERSION = 'v1.0.5';
+    const APP_VERSION = 'v1.0.6';
     const DPI = 300;
     const MM_TO_INCH = 25.4;
     const PIXEL_RATIO = DPI / MM_TO_INCH; // dots per mm (approx 11.81 dots/mm)
@@ -904,10 +907,11 @@
     // UI Controls
     const paperPresetsList = document.getElementById('paperPresetsList');
     const btnSavePaperPreset = document.getElementById('btnSavePaperPreset');
-    const inputMarginLeft = document.getElementById('inputMarginLeft');
-    const inputMarginRight = document.getElementById('inputMarginRight');
-    const lblMarginLeft = document.getElementById('lblMarginLeft');
-    const lblMarginRight = document.getElementById('lblMarginRight');
+    const inputStartByte = document.getElementById('inputStartByte');
+    const inputEndByte = document.getElementById('inputEndByte');
+    const lblStartMM = document.getElementById('lblStartMM');
+    const lblEndMM = document.getElementById('lblEndMM');
+    const btnPrintTestPattern = document.getElementById('btnPrintTestPattern');
     const inputFeedLength = document.getElementById('inputFeedLength');
     const selectHeightMode = document.getElementById('selectHeightMode');
     const fixedHeightGroup = document.getElementById('fixedHeightGroup');
@@ -1030,14 +1034,13 @@
           settings = { ...settings, ...loaded };
           
           // Apply to UI values
-          inputMarginLeft.value = settings.marginLeftMM;
-          inputMarginRight.value = settings.marginRightMM;
+          const byteStart = Math.max(0, Math.min(77, Math.round((parseFloat(settings.marginLeftMM) * PIXEL_RATIO) / 8)));
+          const byteEnd = Math.max(1, Math.min(78, 78 - Math.round((parseFloat(settings.marginRightMM) * PIXEL_RATIO) / 8)));
+          inputStartByte.value = byteStart;
+          inputEndByte.value = byteEnd;
           inputFeedLength.value = settings.feedLengthMM;
           selectHeightMode.value = settings.heightMode;
           inputLabelHeight.value = settings.labelHeightMM;
-          
-          lblMarginLeft.textContent = settings.marginLeftMM + ' mm';
-          lblMarginRight.textContent = settings.marginRightMM + ' mm';
           
           if (settings.heightMode === 'fixed') {
             fixedHeightGroup.classList.remove('hidden');
@@ -1133,8 +1136,10 @@
       settings.feedLengthMM = preset.feedLengthMM;
 
       // Update Sliders and inputs in UI
-      inputMarginLeft.value = settings.marginLeftMM;
-      inputMarginRight.value = settings.marginRightMM;
+      const byteStart = Math.max(0, Math.min(77, Math.round((parseFloat(settings.marginLeftMM) * PIXEL_RATIO) / 8)));
+      const byteEnd = Math.max(1, Math.min(78, 78 - Math.round((parseFloat(settings.marginRightMM) * PIXEL_RATIO) / 8)));
+      inputStartByte.value = byteStart;
+      inputEndByte.value = byteEnd;
       inputFeedLength.value = settings.feedLengthMM;
 
       saveSettingsToStorage();
@@ -1246,9 +1251,8 @@
       
       canvas.width = 624;
       
-      // Update UI labels if elements exist
-      if (lblMarginLeft) lblMarginLeft.textContent = (leftMarginPx / PIXEL_RATIO).toFixed(1) + ' mm';
-      if (lblMarginRight) lblMarginRight.textContent = (rightMarginPx / PIXEL_RATIO).toFixed(1) + ' mm';
+      if (lblStartMM) lblStartMM.textContent = (leftMarginPx / PIXEL_RATIO).toFixed(1) + ' mm';
+      if (lblEndMM) lblEndMM.textContent = ((624 - rightMarginPx) / PIXEL_RATIO).toFixed(1) + ' mm';
       
       // Height calculation
       if (settings.heightMode === 'fixed') {
@@ -1293,34 +1297,36 @@
         }
       });
 
-      inputMarginLeft.addEventListener('input', (e) => {
-        let val = parseFloat(e.target.value) || 0;
-        const maxVal = 48 - parseFloat(settings.marginRightMM);
-        if (val > maxVal) {
-          val = maxVal;
+      inputStartByte.addEventListener('input', (e) => {
+        let val = parseInt(e.target.value) || 0;
+        const currentEnd = parseInt(inputEndByte.value);
+        if (val >= currentEnd) {
+          val = currentEnd - 1;
           e.target.value = val;
         }
-        settings.marginLeftMM = val;
-        lblMarginLeft.textContent = settings.marginLeftMM.toFixed(1) + ' mm';
+        settings.marginLeftMM = (val * 8) / PIXEL_RATIO;
         saveSettingsToStorage();
         updateCanvasSize();
         render();
         renderPaperPresetsList();
       });
 
-      inputMarginRight.addEventListener('input', (e) => {
-        let val = parseFloat(e.target.value) || 0;
-        const maxVal = 48 - parseFloat(settings.marginLeftMM);
-        if (val > maxVal) {
-          val = maxVal;
+      inputEndByte.addEventListener('input', (e) => {
+        let val = parseInt(e.target.value) || 78;
+        const currentStart = parseInt(inputStartByte.value);
+        if (val <= currentStart) {
+          val = currentStart + 1;
           e.target.value = val;
         }
-        settings.marginRightMM = val;
-        lblMarginRight.textContent = settings.marginRightMM.toFixed(1) + ' mm';
+        settings.marginRightMM = ((78 - val) * 8) / PIXEL_RATIO;
         saveSettingsToStorage();
         updateCanvasSize();
         render();
         renderPaperPresetsList();
+      });
+
+      btnPrintTestPattern.addEventListener('click', () => {
+        printTestPattern();
       });
 
       inputFeedLength.addEventListener('change', (e) => {
@@ -2412,6 +2418,175 @@
       }
     }
 
+    // Calibration Test Pattern print (Pleine largeur 624 px, hauteur 36 px)
+    async function printTestPattern() {
+      if (!printerCharacteristic) {
+        alert("Veuillez d'abord vous connecter à l'imprimante !");
+        return;
+      }
+
+      try {
+        isPrintingCancelled = false;
+        printOverlay.style.display = 'flex';
+        printProgressTitle.textContent = "Préparation de la mire...";
+        printProgressSub.textContent = "Génération de la règle graduée...";
+        printProgressBar.style.width = '10%';
+        await sleep(100);
+
+        // 1. Create a 624 x 36 canvas
+        const width = 624;
+        const height = 36;
+        const testCanvas = document.createElement('canvas');
+        testCanvas.width = width;
+        testCanvas.height = height;
+        const tCtx = testCanvas.getContext('2d');
+
+        // Draw white background
+        tCtx.fillStyle = '#ffffff';
+        tCtx.fillRect(0, 0, width, height);
+
+        // Draw black border at top and bottom
+        tCtx.fillStyle = '#000000';
+        tCtx.fillRect(0, 0, width, 2);
+        tCtx.fillRect(0, height - 2, width, 2);
+
+        // Draw ticks every 1mm and chiffrés every 5mm
+        tCtx.textAlign = 'center';
+        tCtx.textBaseline = 'top';
+        
+        for (let mm = 0; mm * PIXEL_RATIO < width; mm++) {
+          const x = Math.round(mm * PIXEL_RATIO);
+          if (mm % 5 === 0) {
+            // Draw medium tick (6px)
+            tCtx.fillRect(x, 2, 1, 6);
+            tCtx.fillRect(x, height - 8, 1, 6);
+            
+            // Draw text label centered
+            tCtx.fillStyle = '#000000';
+            tCtx.font = '8px monospace';
+            if (mm > 0 && x < width - 12) {
+              tCtx.fillText(mm.toString(), x, 14);
+            }
+          } else {
+            // Draw small tick (3px)
+            tCtx.fillRect(x, 2, 1, 3);
+            tCtx.fillRect(x, height - 5, 1, 3);
+          }
+        }
+
+        // Draw "G" and "D" at extremities
+        tCtx.fillStyle = '#000000';
+        tCtx.font = 'bold 12px sans-serif';
+        tCtx.textAlign = 'left';
+        tCtx.fillText("G", 4, 12);
+        
+        tCtx.textAlign = 'right';
+        tCtx.fillText("D", width - 4, 12);
+
+        // 2. Read pixels and construct 1-bit monochrome data
+        const imgData = tCtx.getImageData(0, 0, width, height);
+        const data = imgData.data;
+        const mono = new Uint8Array(width * height);
+        
+        for (let i = 0; i < data.length; i += 4) {
+          // simple threshold since it's black/white vector lines
+          const r = data[i];
+          mono[i / 4] = r < 128 ? 1 : 0; // 1 = black, 0 = white
+        }
+
+        // Convert mono 1-bit pixels to packed bytes
+        const bytesPerLine = width / 8; // 624 / 8 = 78 bytes
+        const rawBytes = new Uint8Array(bytesPerLine * height);
+        
+        for (let y = 0; y < height; y++) {
+          for (let xByte = 0; xByte < bytesPerLine; xByte++) {
+            let byteVal = 0;
+            for (let bit = 0; bit < 8; bit++) {
+              const pixelX = xByte * 8 + bit;
+              const pixelIndex = y * width + pixelX;
+              if (mono[pixelIndex] === 1) {
+                byteVal |= (1 << (7 - bit));
+              }
+            }
+            rawBytes[y * bytesPerLine + xByte] = byteVal;
+          }
+        }
+
+        // 3. Send raw print commands
+        printProgressTitle.textContent = "Impression de la mire...";
+        printProgressSub.textContent = "Connexion caractéristique...";
+        
+        // Initialize
+        await printerCharacteristic.writeValue(new Uint8Array([0x1B, 0x40]));
+        // Alignment: left
+        await printerCharacteristic.writeValue(new Uint8Array([0x1B, 0x61, 0x00]));
+        // Density: normal
+        await printerCharacteristic.writeValue(new Uint8Array([0x1F, 0x11, 0x02, 0x04]));
+        await sleep(50);
+
+        // Print raster command header
+        const xL = bytesPerLine & 0xFF;
+        const xH = (bytesPerLine >> 8) & 0xFF;
+        const heightVal = height - 1; // Protocol height - 1
+        const yL = heightVal & 0xFF;
+        const yH = (heightVal >> 8) & 0xFF;
+        
+        const header = new Uint8Array([0x1D, 0x76, 0x30, 0x00, xL, xH, yL, yH]);
+        await printerCharacteristic.writeValue(header);
+        await sleep(20);
+
+        // Send packed data in chunks
+        const chunkSize = 200;
+        let sentBytes = 0;
+        const totalBytes = rawBytes.length;
+
+        while (sentBytes < totalBytes) {
+          if (isPrintingCancelled) {
+            console.log("Impression mire annulée");
+            return;
+          }
+
+          const end = Math.min(sentBytes + chunkSize, totalBytes);
+          const chunk = rawBytes.slice(sentBytes, end);
+          await printerCharacteristic.writeValue(chunk);
+          sentBytes = end;
+
+          const progress = Math.round((sentBytes / totalBytes) * 100);
+          printProgressBar.style.width = progress + '%';
+          await sleep(18);
+        }
+
+        // 4. Send paper feed command (Feed)
+        printProgressSub.textContent = "Finalisation du saut de mire...";
+        const feedMM = parseFloat(settings.feedLengthMM);
+        if (feedMM > 0) {
+          const feedLines = Math.round(feedMM * PIXEL_RATIO);
+          let linesRemaining = feedLines;
+          while (linesRemaining > 0) {
+            const feedChunk = Math.min(255, linesRemaining);
+            await printerCharacteristic.writeValue(new Uint8Array([0x1B, 0x4A, feedChunk]));
+            linesRemaining -= feedChunk;
+            await sleep(50);
+          }
+        }
+
+        // 5. Send Shutdown
+        await printerCharacteristic.writeValue(new Uint8Array([0x1F, 0x11, 0x08]));
+        await printerCharacteristic.writeValue(new Uint8Array([0x1F, 0x11, 0x0E]));
+        await sleep(50);
+
+        printProgressTitle.textContent = "Mire imprimée !";
+        printProgressSub.textContent = "Découpez et mesurez vos limites.";
+        await sleep(800);
+      } catch (err) {
+        console.error("Échec d'impression de la mire :", err);
+        alert("Erreur lors de l'impression de la mire : " + err.message);
+      } finally {
+        printOverlay.style.display = 'none';
+        render();
+      }
+    }
+
     // Undo / Redo History stack
     function pushHistory() {
       // Deep clone element list
@@ -2513,14 +2688,13 @@
           }
 
           // Apply to GUI inputs
-          inputMarginLeft.value = settings.marginLeftMM;
-          inputMarginRight.value = settings.marginRightMM;
+          const byteStart = Math.max(0, Math.min(77, Math.round((parseFloat(settings.marginLeftMM) * PIXEL_RATIO) / 8)));
+          const byteEnd = Math.max(1, Math.min(78, 78 - Math.round((parseFloat(settings.marginRightMM) * PIXEL_RATIO) / 8)));
+          inputStartByte.value = byteStart;
+          inputEndByte.value = byteEnd;
           inputFeedLength.value = settings.feedLengthMM;
           selectHeightMode.value = settings.heightMode;
           inputLabelHeight.value = settings.labelHeightMM;
-          
-          lblMarginLeft.textContent = settings.marginLeftMM + ' mm';
-          lblMarginRight.textContent = settings.marginRightMM + ' mm';
 
           if (settings.heightMode === 'fixed') {
             fixedHeightGroup.classList.remove('hidden');
@@ -2632,13 +2806,13 @@
 
       // Apply settings
       settings = { ...settings, ...t.settings };
-      inputMarginLeft.value = settings.marginLeftMM;
-      inputMarginRight.value = settings.marginRightMM;
+      const byteStart = Math.max(0, Math.min(77, Math.round((parseFloat(settings.marginLeftMM) * PIXEL_RATIO) / 8)));
+      const byteEnd = Math.max(1, Math.min(78, 78 - Math.round((parseFloat(settings.marginRightMM) * PIXEL_RATIO) / 8)));
+      inputStartByte.value = byteStart;
+      inputEndByte.value = byteEnd;
       inputFeedLength.value = settings.feedLengthMM;
       selectHeightMode.value = settings.heightMode;
       inputLabelHeight.value = settings.labelHeightMM;
-      lblMarginLeft.textContent = settings.marginLeftMM + ' mm';
-      lblMarginRight.textContent = settings.marginRightMM + ' mm';
 
       if (settings.heightMode === 'fixed') {
         fixedHeightGroup.classList.remove('hidden');
