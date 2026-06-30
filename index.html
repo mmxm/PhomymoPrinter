@@ -914,7 +914,7 @@
 
   <script>
     // Constants & Configuration
-    const APP_VERSION = 'v1.0.12';
+    const APP_VERSION = 'v1.0.13';
     const DPI = 300;
     const MM_TO_INCH = 25.4;
     const PIXEL_RATIO = DPI / MM_TO_INCH; // dots per mm (approx 11.81 dots/mm)
@@ -1609,17 +1609,7 @@
           }
           
           if (el.type === 'text' && localX >= el.x && localX <= el.x + el.width && localY >= el.y && localY <= el.y + el.height) {
-            const newText = prompt("Modifier le texte :", el.text);
-            if (newText !== null) {
-              el.text = newText;
-              if (selectedElementIndex === i) {
-                inputTextContent.value = newText;
-              }
-              saveDraftToStorage();
-              updateCanvasSize();
-              render();
-              pushHistory();
-            }
+            startInlineEdit(i);
             return;
           }
         }
