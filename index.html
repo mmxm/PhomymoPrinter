@@ -861,7 +861,7 @@
 
   <script>
     // Constants & Configuration
-    const APP_VERSION = 'v1.0.6';
+    const APP_VERSION = 'v1.0.7';
     const DPI = 300;
     const MM_TO_INCH = 25.4;
     const PIXEL_RATIO = DPI / MM_TO_INCH; // dots per mm (approx 11.81 dots/mm)
@@ -2463,9 +2463,9 @@
             
             // Draw text label centered
             tCtx.fillStyle = '#000000';
-            tCtx.font = '8px monospace';
+            tCtx.font = 'bold 10px sans-serif';
             if (mm > 0 && x < width - 12) {
-              tCtx.fillText(mm.toString(), x, 14);
+              tCtx.fillText(mm.toString(), x, 12);
             }
           } else {
             // Draw small tick (3px)
@@ -2476,7 +2476,7 @@
 
         // Draw "G" and "D" at extremities
         tCtx.fillStyle = '#000000';
-        tCtx.font = 'bold 12px sans-serif';
+        tCtx.font = 'bold 13px sans-serif';
         tCtx.textAlign = 'left';
         tCtx.fillText("G", 4, 12);
         

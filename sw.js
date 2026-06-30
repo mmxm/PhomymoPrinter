@@ -1,4 +1,4 @@
-const CACHE_NAME = 'phomemo-printer-v9';
+const CACHE_NAME = 'phomemo-printer-v10';
 const ASSETS = [
   './',
   './index.html',
