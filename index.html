@@ -738,7 +738,16 @@
               <span>Rotation</span>
               <span id="lblPropRotationVal">0°</span>
             </div>
-            <input type="range" id="inputPropRotation" min="0" max="360" step="5" value="0">
+            <div style="display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.3rem;">
+              <input type="range" id="inputPropRotation" min="0" max="360" step="5" value="0" style="flex: 1;">
+              <input type="number" id="inputPropRotationNum" min="0" max="360" value="0" style="width: 60px; padding: 0.2rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--border); background: var(--surface-card); color: var(--text);">
+            </div>
+            <div style="display: flex; gap: 0.25rem;">
+              <button id="btnRotate0" class="secondary" style="flex: 1; padding: 0.2rem; font-size: 0.65rem; justify-content: center;">0°</button>
+              <button id="btnRotate90" class="secondary" style="flex: 1; padding: 0.2rem; font-size: 0.65rem; justify-content: center;">90°</button>
+              <button id="btnRotate180" class="secondary" style="flex: 1; padding: 0.2rem; font-size: 0.65rem; justify-content: center;">180°</button>
+              <button id="btnRotate270" class="secondary" style="flex: 1; padding: 0.2rem; font-size: 0.65rem; justify-content: center;">270°</button>
+            </div>
           </div>
 
           <!-- Dynamic inputs based on selected element type -->
@@ -885,7 +894,7 @@
 
   <script>
     // Constants & Configuration
-    const APP_VERSION = 'v1.0.9';
+    const APP_VERSION = 'v1.0.10';
     const DPI = 300;
     const MM_TO_INCH = 25.4;
     const PIXEL_RATIO = DPI / MM_TO_INCH; // dots per mm (approx 11.81 dots/mm)
@@ -978,6 +987,11 @@
     const selectTextAlign = document.getElementById('selectTextAlign');
     const inputPropRotation = document.getElementById('inputPropRotation');
     const lblPropRotationVal = document.getElementById('lblPropRotationVal');
+    const inputPropRotationNum = document.getElementById('inputPropRotationNum');
+    const btnRotate0 = document.getElementById('btnRotate0');
+    const btnRotate90 = document.getElementById('btnRotate90');
+    const btnRotate180 = document.getElementById('btnRotate180');
+    const btnRotate270 = document.getElementById('btnRotate270');
     const selectDithering = document.getElementById('selectDithering');
     const thresholdGroup = document.getElementById('thresholdGroup');
     const inputThreshold = document.getElementById('inputThreshold');
@@ -1437,11 +1451,26 @@
       selectTextAlign.addEventListener('change', (e) => {
         updateSelectedElement('textAlign', e.target.value);
       });
-      inputPropRotation.addEventListener('input', (e) => {
-        const val = parseInt(e.target.value) || 0;
+      function applyRotation(val) {
+        val = Math.max(0, Math.min(360, val));
+        inputPropRotation.value = val;
+        inputPropRotationNum.value = val;
         lblPropRotationVal.textContent = val + '°';
         updateSelectedElement('rotation', val);
+      }
+
+      inputPropRotation.addEventListener('input', (e) => {
+        applyRotation(parseInt(e.target.value) || 0);
       });
+
+      inputPropRotationNum.addEventListener('input', (e) => {
+        applyRotation(parseInt(e.target.value) || 0);
+      });
+
+      btnRotate0.addEventListener('click', () => applyRotation(0));
+      btnRotate90.addEventListener('click', () => applyRotation(90));
+      btnRotate180.addEventListener('click', () => applyRotation(180));
+      btnRotate270.addEventListener('click', () => applyRotation(270));
 
       selectDithering.addEventListener('change', (e) => {
         updateSelectedElement('dithering', e.target.value);
@@ -1526,6 +1555,40 @@
       canvas.addEventListener('mousedown', handleCanvasMouseDown);
       canvas.addEventListener('mousemove', handleCanvasMouseMove);
       window.addEventListener('mouseup', handleCanvasMouseUp);
+
+      canvas.addEventListener('dblclick', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const clientX = (e.clientX - rect.left) / zoomLevel;
+        const clientY = (e.clientY - rect.top) / zoomLevel;
+
+        for (let i = elements.length - 1; i >= 0; i--) {
+          const el = elements[i];
+          let localX = clientX;
+          let localY = clientY;
+          if (el.rotation) {
+            const cx = el.x + el.width / 2;
+            const cy = el.y + el.height / 2;
+            const local = getLocalCoords(clientX, clientY, cx, cy, el.rotation);
+            localX = local.x;
+            localY = local.y;
+          }
+          
+          if (el.type === 'text' && localX >= el.x && localX <= el.x + el.width && localY >= el.y && localY <= el.y + el.height) {
+            const newText = prompt("Modifier le texte :", el.text);
+            if (newText !== null) {
+              el.text = newText;
+              if (selectedElementIndex === i) {
+                inputTextContent.value = newText;
+              }
+              saveDraftToStorage();
+              updateCanvasSize();
+              render();
+              pushHistory();
+            }
+            return;
+          }
+        }
+      });
 
       // Touch support for mobile devices
       canvas.addEventListener('touchstart', (e) => {
@@ -2013,6 +2076,7 @@
 
       // Universal properties
       inputPropRotation.value = el.rotation || 0;
+      inputPropRotationNum.value = el.rotation || 0;
       lblPropRotationVal.textContent = (el.rotation || 0) + '°';
 
       if (el.type === 'text') {
