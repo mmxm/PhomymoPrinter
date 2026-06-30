@@ -858,7 +858,7 @@
 
   <script>
     // Constants & Configuration
-    const APP_VERSION = 'v1.0.2';
+    const APP_VERSION = 'v1.0.3';
     const DPI = 300;
     const MM_TO_INCH = 25.4;
     const PIXEL_RATIO = DPI / MM_TO_INCH; // dots per mm (approx 11.81 dots/mm)
@@ -881,6 +881,7 @@
     let history = [];
     let historyIndex = -1;
     let isPrintingCancelled = false;
+    let customPaperPresets = [];
 
     // Viewport Zoom
     let zoomLevel = 1.0;
