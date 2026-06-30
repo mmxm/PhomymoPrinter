@@ -1,0 +1,2588 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sticker Printer Pro - Phomemo M02S</title>
+  
+  <!-- PWA Manifest Inline -->
+  <link rel="manifest" href='data:application/manifest+json,{"name":"Sticker Printer Pro","short_name":"StickerPrinter","start_url":".","display":"standalone","background_color":"#0f0f11","theme_color":"#2563eb","icons":[{"src":"data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2222%22 fill=%22%232563eb%22/><path d=%22M30,30 h40 v40 h-40 z%22 fill=%22none%22 stroke=%22white%22 stroke-width=%228%22/><circle cx=%2250%22 cy=%2250%22 r=%228%22 fill=%22white%22/></svg>","sizes":"512x512","type":"image/svg+xml"}]}' />
+  
+  <!-- Google Fonts -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&family=Courier+Prime&family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Roboto+Mono&display=swap" />
+  
+  <!-- JS Libraries from CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+
+  <style>
+    :root {
+      --bg: #0b0b0d;
+      --surface: #131316;
+      --surface-card: #1c1c21;
+      --surface-hover: #26262e;
+      --text: #f3f3f7;
+      --text-secondary: #8e8e9f;
+      --accent: #2563eb;
+      --accent-hover: #3b82f6;
+      --accent-dim: #1e3a8a;
+      --border: #2c2c35;
+      --danger: #dc2626;
+      --success: #16a34a;
+      --warning: #ca8a04;
+      --sidebar-width: 320px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', -apple-system, sans-serif;
+      user-select: none;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    header {
+      background-color: var(--surface);
+      border-bottom: 1px fill var(--border);
+      border-bottom: 1px solid var(--border);
+      padding: 0.75rem 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 10;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .brand svg {
+      width: 28px;
+      height: 28px;
+      fill: var(--accent);
+    }
+
+    .brand h1 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .device-status {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      background-color: var(--surface-card);
+      padding: 0.5rem 1rem;
+      border-radius: 99px;
+      border: 1px solid var(--border);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: var(--danger);
+      box-shadow: 0 0 8px var(--danger);
+    }
+
+    .status-dot.connected {
+      background-color: var(--success);
+      box-shadow: 0 0 8px var(--success);
+    }
+
+    .status-dot.connecting {
+      background-color: var(--warning);
+      box-shadow: 0 0 8px var(--warning);
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0% { opacity: 0.4; }
+      50% { opacity: 1; }
+      100% { opacity: 0.4; }
+    }
+
+    .status-text {
+      font-size: 0.85rem;
+      font-weight: 500;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 0.75rem;
+    }
+
+    button {
+      background-color: var(--surface-card);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: all 0.2s ease;
+    }
+
+    button:hover:not(:disabled) {
+      background-color: var(--surface-hover);
+      border-color: var(--text-secondary);
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    button.primary {
+      background-color: var(--accent);
+      border-color: var(--accent);
+    }
+
+    button.primary:hover:not(:disabled) {
+      background-color: var(--accent-hover);
+      border-color: var(--accent-hover);
+    }
+
+    /* Layout structure */
+    .main-container {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Left Sidebar */
+    .sidebar-left {
+      width: var(--sidebar-width);
+      background-color: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+
+    /* Right Sidebar */
+    .sidebar-right {
+      width: var(--sidebar-width);
+      background-color: var(--surface);
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+
+    /* Sidebar Content Sections */
+    .sidebar-section {
+      padding: 1.25rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .sidebar-section h2 {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-secondary);
+      margin-bottom: 1rem;
+      font-weight: 700;
+    }
+
+    .form-group {
+      margin-bottom: 1rem;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+      margin-bottom: 0.4rem;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    select, input[type="text"], input[type="number"] {
+      width: 100%;
+      background-color: var(--surface-card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.5rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    select:focus, input:focus {
+      border-color: var(--accent);
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+      background: var(--border);
+      height: 6px;
+      border-radius: 3px;
+      outline: none;
+    }
+
+    .range-val {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text);
+      min-width: 32px;
+      text-align: right;
+    }
+
+    /* Button rows */
+    .button-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem;
+    }
+
+    /* Central Workspace */
+    .workspace {
+      flex: 1;
+      background-color: #08080a;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Floating Toolbar */
+    .floating-toolbar {
+      position: absolute;
+      top: 1rem;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: rgba(28, 28, 33, 0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      padding: 0.4rem;
+      border-radius: 99px;
+      display: flex;
+      gap: 0.25rem;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      z-index: 5;
+    }
+
+    .toolbar-btn {
+      background: transparent;
+      border: none;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.2s;
+      padding: 0;
+    }
+
+    .toolbar-btn:hover {
+      background-color: var(--surface-hover);
+      color: var(--text);
+    }
+
+    .toolbar-btn svg {
+      width: 20px;
+      height: 20px;
+      fill: currentColor;
+    }
+
+    /* Canvas Wrapper */
+    .canvas-container {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem;
+      overflow: auto;
+      position: relative;
+    }
+
+    .canvas-wrapper {
+      position: relative;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+      background-color: white;
+      border: 1px solid var(--border);
+    }
+
+    /* Actual Canvas */
+    canvas#editorCanvas {
+      display: block;
+      background-color: white;
+      cursor: default;
+    }
+
+    /* Bottom Action Bar */
+    .zoom-bar {
+      position: absolute;
+      bottom: 1rem;
+      right: 1rem;
+      background-color: rgba(28, 28, 33, 0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      padding: 0.4rem 0.8rem;
+      border-radius: 99px;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+      z-index: 5;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    /* Saved Templates list */
+    .saved-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .saved-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background-color: var(--surface-card);
+      border: 1px solid var(--border);
+      padding: 0.5rem 0.75rem;
+      border-radius: 6px;
+      font-size: 0.8rem;
+    }
+
+    .saved-item span {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 140px;
+      cursor: pointer;
+    }
+
+    .saved-item span:hover {
+      text-decoration: underline;
+    }
+
+    .saved-item button {
+      background: transparent;
+      border: none;
+      padding: 0.25rem;
+      color: var(--text-secondary);
+    }
+
+    .saved-item button:hover {
+      color: var(--danger);
+      background: transparent;
+    }
+
+    /* Elements Layer List */
+    .layers-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      margin-top: 0.5rem;
+      max-height: 220px;
+      overflow-y: auto;
+    }
+
+    .layer-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background-color: var(--surface-card);
+      border: 1px solid var(--border);
+      padding: 0.4rem 0.6rem;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+
+    .layer-item.active {
+      border-color: var(--accent);
+      background-color: var(--accent-dim);
+    }
+
+    .layer-item-info {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    .layer-item-info svg {
+      width: 14px;
+      height: 14px;
+      fill: var(--text-secondary);
+    }
+
+    .layer-actions {
+      display: flex;
+      gap: 0.25rem;
+    }
+
+    .layer-btn {
+      background: transparent;
+      border: none;
+      padding: 0.15rem;
+      color: var(--text-secondary);
+      border-radius: 4px;
+    }
+
+    .layer-btn:hover {
+      background-color: var(--surface-hover);
+      color: var(--text);
+    }
+
+    /* Modal / Overlay for print progress */
+    .print-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(11, 11, 13, 0.85);
+      z-index: 100;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    .print-dialog {
+      background-color: var(--surface);
+      border: 1px solid var(--border);
+      padding: 2rem;
+      border-radius: 12px;
+      width: 400px;
+      box-shadow: 0 20px 45px rgba(0, 0, 0, 0.6);
+      text-align: center;
+    }
+
+    .progress-bar-container {
+      width: 100%;
+      height: 8px;
+      background-color: var(--border);
+      border-radius: 4px;
+      margin: 1.5rem 0;
+      overflow: hidden;
+    }
+
+    .progress-bar {
+      width: 0%;
+      height: 100%;
+      background-color: var(--accent);
+      transition: width 0.1s ease;
+    }
+
+    /* Utilities */
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <div class="brand">
+      <!-- Printer SVG Icon -->
+      <svg viewBox="0 0 24 24">
+        <path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/>
+      </svg>
+      <div>
+        <h1>Sticker Printer Pro</h1>
+        <span id="appVersion" style="font-size: 0.65rem; color: var(--text-secondary); display: block; margin-top: -0.1rem;">v0.0.0</span>
+      </div>
+    </div>
+    
+    <div class="header-actions">
+      <div class="device-status">
+        <div id="statusDot" class="status-dot"></div>
+        <span id="statusText" class="status-text">Non connecté</span>
+      </div>
+      <button id="btnConnect" class="primary">
+        <svg style="width: 16px; height: 16px; fill: currentColor;" viewBox="0 0 24 24">
+          <path d="M17.71 7.71L12 2h-1v7.59L6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 11 14.41V22h1l5.71-5.71-4.3-4.29 4.3-4.29zM13 5.83l1.88 1.88L13 9.59V5.83zm1.88 10.29L13 18.17v-3.76l1.88 1.88z"/>
+        </svg>
+        <span>Connexion</span>
+      </button>
+      <button id="btnPrint" disabled class="primary">
+        <svg style="width: 16px; height: 16px; fill: currentColor;" viewBox="0 0 24 24">
+          <path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/>
+        </svg>
+        <span>Imprimer</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="main-container">
+    
+    <!-- Left Sidebar: Settings -->
+    <div class="sidebar-left">
+      <!-- Paper Settings -->
+      <div class="sidebar-section">
+        <h2>Format & Papier</h2>
+        
+        <div class="form-group">
+          <label for="selectPaperWidth">Largeur du rouleau</label>
+          <select id="selectPaperWidth">
+            <option value="53" selected>53 mm (Large)</option>
+            <option value="25">25 mm (Moyen)</option>
+            <option value="15">15 mm (Étroit)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Marges Physiques (G/D)</label>
+          <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
+            <button id="btnMarginOfficial" style="flex: 1; padding: 0.35rem; font-size: 0.75rem;">Papier Officiel</button>
+            <button id="btnMarginBorderless" style="flex: 1; padding: 0.35rem; font-size: 0.75rem;">Sans Marges</button>
+          </div>
+          <div class="form-group" style="margin-bottom: 0.5rem;">
+            <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.2rem;">
+              <span>Gauche</span>
+              <span id="lblMarginLeft">0 mm</span>
+            </div>
+            <input type="range" id="inputMarginLeft" min="0" max="10" step="0.5" value="0">
+          </div>
+          <div class="form-group">
+            <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.2rem;">
+              <span>Droite</span>
+              <span id="lblMarginRight">3 mm</span>
+            </div>
+            <input type="range" id="inputMarginRight" min="0" max="10" step="0.5" value="3">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="inputFeedLength">Saut de papier (Feed)</label>
+          <div class="input-row">
+            <input type="number" id="inputFeedLength" min="0" max="50" value="15">
+            <span style="font-size: 0.85rem; color: var(--text-secondary);">mm</span>
+          </div>
+          <button id="btnFeedManual" style="width: 100%; margin-top: 0.5rem; justify-content: center; padding: 0.4rem;">
+            Dérouler manuellement
+          </button>
+        </div>
+
+        <div class="form-group">
+          <label for="selectHeightMode">Mode Hauteur</label>
+          <select id="selectHeightMode">
+            <option value="auto" selected>Auto (Défilement continu)</option>
+            <option value="fixed">Fixe</option>
+          </select>
+        </div>
+
+        <div id="fixedHeightGroup" class="form-group hidden">
+          <label for="inputLabelHeight">Hauteur fixe</label>
+          <div class="input-row">
+            <input type="number" id="inputLabelHeight" min="1" max="300" value="50">
+            <span style="font-size: 0.85rem; color: var(--text-secondary);">mm</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Config Import/Export -->
+      <div class="sidebar-section">
+        <h2>Configurations JSON</h2>
+        <div class="button-grid">
+          <button id="btnExportConfig" style="justify-content: center; padding: 0.4rem;">Exporter</button>
+          <button id="btnImportConfigClick" style="justify-content: center; padding: 0.4rem;">Importer</button>
+        </div>
+        <input type="file" id="fileImportConfig" accept=".json" style="display: none;">
+        <button id="btnResetFactory" style="width: 100%; justify-content: center; padding: 0.4rem; color: var(--danger); border-color: rgba(220,38,38,0.3); margin-top: 0.5rem;">
+          Réinitialiser d'Usine
+        </button>
+      </div>
+
+      <!-- Saved Templates -->
+      <div class="sidebar-section">
+        <h2>Modèles Sauvegardés</h2>
+        <div class="form-group">
+          <div class="input-row">
+            <input type="text" id="inputTemplateName" placeholder="Nom du modèle...">
+            <button id="btnSaveTemplate" class="primary" style="padding: 0.5rem;">Sauver</button>
+          </div>
+        </div>
+        <div id="savedTemplatesList" class="saved-list">
+          <!-- Populated by JS -->
+          <div style="font-size: 0.75rem; color: var(--text-secondary); text-align: center; padding: 1rem;">Aucun modèle sauvegardé</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Center Workspace -->
+    <div class="workspace">
+      <!-- Toolbar -->
+      <div class="floating-toolbar">
+        <button id="btnAddText" class="toolbar-btn" title="Ajouter du Texte">
+          <svg viewBox="0 0 24 24"><path d="M5 4v3h5.5v12h3V7H19V4H5z"/></svg>
+        </button>
+        <button id="btnAddImage" class="toolbar-btn" title="Ajouter une Image">
+          <svg viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c0 1.1-.9-2-2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+        </button>
+        <button id="btnAddQR" class="toolbar-btn" title="Ajouter un QR Code">
+          <svg viewBox="0 0 24 24"><path d="M3 11h8V3H3v8zm2-6h4v4H5V5zM3 21h8v-8H3v8zm2-6h4v4H5v-4zm8-12v8h8V3h-8zm6 6h-4V5h4v4zm0 10h2v2h-2zm-6-6h2v2h-2zm2 2h2v2h-2zm-2 2h2v2h-2zm2 2h2v2h-2zm2-2h2v2h-2zm0-4h2v2h-2zm2 2h2v2h-2z"/></svg>
+        </button>
+        <button id="btnAddBarcode" class="toolbar-btn" title="Ajouter un Code-barres">
+          <svg viewBox="0 0 24 24"><path d="M3 5h2v14H3zm4 0h1v14H7zm3 0h2v14h-2zm4 0h1v14h-1zm3 0h3v14h-3z"/></svg>
+        </button>
+        <button id="btnAddRect" class="toolbar-btn" title="Ajouter un Rectangle">
+          <svg viewBox="0 0 24 24"><path d="M3 3h18v18H3V3zm2 2v14h14V5H5z"/></svg>
+        </button>
+        <button id="btnAddRoundRect" class="toolbar-btn" title="Ajouter un Rectangle Arrondi">
+          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="4" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+        </button>
+        <button id="btnAddCircle" class="toolbar-btn" title="Ajouter un Cercle">
+          <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>
+        </button>
+        <button id="btnAddTriangle" class="toolbar-btn" title="Ajouter un Triangle">
+          <svg viewBox="0 0 24 24"><polygon points="12,3 21,21 3,21" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+        </button>
+        <button id="btnAddLine" class="toolbar-btn" title="Ajouter une Ligne">
+          <svg viewBox="0 0 24 24"><path d="M13 4A1 1 0 0 0 12 3A1 1 0 0 0 11 4A1 1 0 0 0 11 11.06L5.38 16.69A1.5 1.5 0 0 0 6.44 19.25A1.5 1.5 0 0 0 7.5 18.81L13.12 13.19A1 1 0 0 0 13 13A1 1 0 0 0 13 4Z"/></svg>
+        </button>
+      </div>
+
+      <!-- Hidden Input for Image Upload -->
+      <input type="file" id="fileImageUpload" accept="image/*" style="display: none;">
+
+      <!-- Canvas container -->
+      <div class="canvas-container">
+        <div id="canvasWrapper" class="canvas-wrapper">
+          <canvas id="editorCanvas"></canvas>
+        </div>
+      </div>
+
+      <!-- Zoom and coordinates status -->
+      <div class="zoom-bar">
+        <button id="btnZoomOut" style="border: none; padding: 0.15rem; background: transparent;">−</button>
+        <span id="lblZoom">Zoom: 100%</span>
+        <button id="btnZoomIn" style="border: none; padding: 0.15rem; background: transparent;">+</button>
+      </div>
+    </div>
+
+    <!-- Right Sidebar: Properties -->
+    <div class="sidebar-right">
+      <div class="sidebar-section">
+        <h2>Actions Communes</h2>
+        <div class="button-grid" style="margin-bottom: 0.5rem;">
+          <button id="btnUndo" style="justify-content: center; padding: 0.4rem;">
+            <svg style="width: 14px; height: 14px; fill: currentColor;" viewBox="0 0 24 24">
+              <path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/>
+            </svg>
+            Annuler
+          </button>
+          <button id="btnRedo" style="justify-content: center; padding: 0.4rem;">
+            <svg style="width: 14px; height: 14px; fill: currentColor;" viewBox="0 0 24 24">
+              <path d="M18.4 10.6C16.55 8.99 14.15 8 11.5 8c-4.65 0-8.58 3.03-9.96 7.22L3.9 16c1.05-3.19 4.05-5.5 7.6-5.5 1.95 0 3.73.72 5.12 1.88L13 16h9V7l-3.6 3.6z"/>
+            </svg>
+            Rétablir
+          </button>
+        </div>
+        <button id="btnClearAll" style="width: 100%; justify-content: center; padding: 0.4rem; color: var(--danger); border-color: rgba(220,38,38,0.3);">
+          Tout effacer
+        </button>
+      </div>
+
+      <!-- Selected Element properties panel -->
+      <div class="sidebar-section" style="flex: 1; display: flex; flex-direction: column;">
+        <h2>Propriétés</h2>
+        
+        <div id="propPanelEmpty" style="font-size: 0.8rem; color: var(--text-secondary); text-align: center; padding: 2rem 0;">
+          Sélectionnez un élément pour modifier ses propriétés.
+        </div>
+
+        <div id="propPanelActive" class="hidden" style="display: flex; flex-direction: column; gap: 1rem;">
+          <!-- Layer Position & Actions -->
+          <div style="display: flex; gap: 0.25rem;">
+            <button id="btnPropMoveUp" style="flex: 1; padding: 0.35rem; font-size: 0.75rem; justify-content: center;" title="Monter d'un niveau">Monter</button>
+            <button id="btnPropMoveDown" style="flex: 1; padding: 0.35rem; font-size: 0.75rem; justify-content: center;" title="Descendre d'un niveau">Descendre</button>
+            <button id="btnPropDuplicate" style="flex: 1; padding: 0.35rem; font-size: 0.75rem; justify-content: center;">Dupliquer</button>
+            <button id="btnPropDelete" style="padding: 0.35rem; font-size: 0.75rem; color: var(--danger);" title="Supprimer">Suppr.</button>
+          </div>
+
+          <!-- Dynamic inputs based on selected element type -->
+          <!-- TEXT SECTION -->
+          <div id="propSectionText" class="hidden">
+            <div class="form-group">
+              <label for="inputTextContent">Texte</label>
+              <input type="text" id="inputTextContent">
+            </div>
+            <div class="form-group">
+              <label for="selectTextFont">Police</label>
+              <select id="selectTextFont">
+                <option value="Inter">Inter (Sans-serif)</option>
+                <option value="Outfit">Outfit (Moderne)</option>
+                <option value="Courier Prime">Courier Prime (Monospace)</option>
+                <option value="Playfair Display">Playfair Display (Serif)</option>
+                <option value="Roboto Mono">Roboto Mono</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="inputTextSize">Taille (px)</label>
+              <div class="input-row">
+                <input type="number" id="inputTextSize" min="6" max="150" value="24">
+              </div>
+            </div>
+            <div style="display: flex; gap: 0.5rem;">
+              <button id="btnTextBold" style="flex: 1; justify-content: center; padding: 0.4rem;">Gras</button>
+              <button id="btnTextItalic" style="flex: 1; justify-content: center; padding: 0.4rem;">Italique</button>
+            </div>
+          </div>
+
+          <!-- IMAGE SECTION -->
+          <div id="propSectionImage" class="hidden">
+            <div class="form-group">
+              <label for="selectDithering">Algorithme de Tramage</label>
+              <select id="selectDithering">
+                <option value="atkinson" selected>Atkinson (Recommandé)</option>
+                <option value="floyd">Floyd-Steinberg</option>
+                <option value="threshold">Seuil Simple (Binaire)</option>
+              </select>
+            </div>
+            <div class="form-group" id="thresholdGroup">
+              <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.2rem;">
+                <span>Seuil Noir/Blanc</span>
+                <span id="lblThresholdVal">128</span>
+              </div>
+              <input type="range" id="inputThreshold" min="10" max="240" value="128">
+            </div>
+            <div class="form-group">
+              <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.2rem;">
+                <span>Contraste</span>
+                <span id="lblContrastVal">0%</span>
+              </div>
+              <input type="range" id="inputContrast" min="-100" max="100" value="0">
+            </div>
+            <div class="form-group">
+              <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.2rem;">
+                <span>Luminosité</span>
+                <span id="lblBrightnessVal">0%</span>
+              </div>
+              <input type="range" id="inputBrightness" min="-100" max="100" value="0">
+            </div>
+          </div>
+
+          <!-- CODE SECTION (QR or Barcode) -->
+          <div id="propSectionCode" class="hidden">
+            <div class="form-group">
+              <label for="inputCodeContent">Contenu du Code</label>
+              <input type="text" id="inputCodeContent">
+            </div>
+            <div id="barcodeFormatGroup" class="form-group">
+              <label for="selectBarcodeFormat">Format Code-barres</label>
+              <select id="selectBarcodeFormat">
+                <option value="CODE128">Code 128</option>
+                <option value="EAN13">EAN 13</option>
+                <option value="EAN8">EAN 8</option>
+                <option value="UPC">UPC-A</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- SHAPE SECTION -->
+          <div id="propSectionShape" class="hidden">
+            <div class="form-group">
+              <label for="inputStrokeWidth">Épaisseur du trait</label>
+              <input type="number" id="inputStrokeWidth" min="1" max="20" value="2">
+            </div>
+            <div class="form-group" id="roundRectRadiusGroup">
+              <label for="inputRoundRectRadius">Rayon des coins (px)</label>
+              <input type="number" id="inputRoundRectRadius" min="0" max="100" value="10">
+            </div>
+            <div class="form-group" id="fillShapeGroup">
+              <label for="selectFillShape">Remplissage</label>
+              <select id="selectFillShape">
+                <option value="black">Noir</option>
+                <option value="transparent" selected>Transparent</option>
+                <option value="white">Blanc</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Layers list in Sidebar Right -->
+      <div class="sidebar-section">
+        <h2>Calques</h2>
+        <div id="layersListContainer" class="layers-list">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Print progress dialog / overlay -->
+  <div id="printOverlay" class="print-overlay">
+    <div class="print-dialog">
+      <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.2rem; margin-bottom: 0.5rem;" id="printProgressTitle">Impression en cours</h3>
+      <p style="font-size: 0.85rem; color: var(--text-secondary);" id="printProgressSub">Veuillez patienter...</p>
+      
+      <div class="progress-bar-container">
+        <div id="printProgressBar" class="progress-bar"></div>
+      </div>
+      
+      <button id="btnCancelPrint" style="margin: 0 auto; color: var(--danger); border-color: rgba(220,38,38,0.3);">
+        Annuler l'impression
+      </button>
+    </div>
+  </div>
+
+  <script>
+    // Constants & Configuration
+    const APP_VERSION = 'v1.0.1';
+    const DPI = 300;
+    const MM_TO_INCH = 25.4;
+    const PIXEL_RATIO = DPI / MM_TO_INCH; // dots per mm (approx 11.81 dots/mm)
+
+    // App State
+    let printerDevice = null;
+    let printerCharacteristic = null;
+    let elements = [];
+    let selectedElementIndex = -1;
+    let isDragging = false;
+    let isResizing = false;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let dragOffsetLeft = 0;
+    let dragOffsetTop = 0;
+    let resizeHandleSize = 10;
+    let initialResizeWidth = 0;
+    let initialResizeHeight = 0;
+    let activeResizeHandle = ''; // 'br'
+    let history = [];
+    let historyIndex = -1;
+    let isPrintingCancelled = false;
+
+    // Viewport Zoom
+    let zoomLevel = 1.0;
+
+    // Document settings (pixel width/height dynamically computed)
+    let settings = {
+      paperWidthMM: 53,
+      marginLeftMM: 0,
+      marginRightMM: 3,
+      feedLengthMM: 15,
+      heightMode: 'auto', // 'auto' or 'fixed'
+      labelHeightMM: 50
+    };
+
+    // DOM Elements
+    const canvas = document.getElementById('editorCanvas');
+    const ctx = canvas.getContext('2d');
+    const canvasWrapper = document.getElementById('canvasWrapper');
+
+    // UI Controls
+    const selectPaperWidth = document.getElementById('selectPaperWidth');
+    const btnMarginOfficial = document.getElementById('btnMarginOfficial');
+    const btnMarginBorderless = document.getElementById('btnMarginBorderless');
+    const inputMarginLeft = document.getElementById('inputMarginLeft');
+    const inputMarginRight = document.getElementById('inputMarginRight');
+    const lblMarginLeft = document.getElementById('lblMarginLeft');
+    const lblMarginRight = document.getElementById('lblMarginRight');
+    const inputFeedLength = document.getElementById('inputFeedLength');
+    const selectHeightMode = document.getElementById('selectHeightMode');
+    const fixedHeightGroup = document.getElementById('fixedHeightGroup');
+    const inputLabelHeight = document.getElementById('inputLabelHeight');
+    const btnConnect = document.getElementById('btnConnect');
+    const btnPrint = document.getElementById('btnPrint');
+    const statusDot = document.getElementById('statusDot');
+    const statusText = document.getElementById('statusText');
+    const btnFeedManual = document.getElementById('btnFeedManual');
+
+    // Toolbar buttons
+    const btnAddText = document.getElementById('btnAddText');
+    const btnAddImage = document.getElementById('btnAddImage');
+    const fileImageUpload = document.getElementById('fileImageUpload');
+    const btnAddQR = document.getElementById('btnAddQR');
+    const btnAddBarcode = document.getElementById('btnAddBarcode');
+    const btnAddRect = document.getElementById('btnAddRect');
+    const btnAddRoundRect = document.getElementById('btnAddRoundRect');
+    const btnAddCircle = document.getElementById('btnAddCircle');
+    const btnAddTriangle = document.getElementById('btnAddTriangle');
+    const btnAddLine = document.getElementById('btnAddLine');
+
+    // Properties sidebar
+    const propPanelEmpty = document.getElementById('propPanelEmpty');
+    const propPanelActive = document.getElementById('propPanelActive');
+    const propSectionText = document.getElementById('propSectionText');
+    const propSectionImage = document.getElementById('propSectionImage');
+    const propSectionCode = document.getElementById('propSectionCode');
+    const propSectionShape = document.getElementById('propSectionShape');
+    const layersListContainer = document.getElementById('layersListContainer');
+
+    // Property inputs
+    const inputTextContent = document.getElementById('inputTextContent');
+    const selectTextFont = document.getElementById('selectTextFont');
+    const inputTextSize = document.getElementById('inputTextSize');
+    const btnTextBold = document.getElementById('btnTextBold');
+    const btnTextItalic = document.getElementById('btnTextItalic');
+    const selectDithering = document.getElementById('selectDithering');
+    const thresholdGroup = document.getElementById('thresholdGroup');
+    const inputThreshold = document.getElementById('inputThreshold');
+    const lblThresholdVal = document.getElementById('lblThresholdVal');
+    const inputContrast = document.getElementById('inputContrast');
+    const lblContrastVal = document.getElementById('lblContrastVal');
+    const inputBrightness = document.getElementById('inputBrightness');
+    const lblBrightnessVal = document.getElementById('lblBrightnessVal');
+    const inputCodeContent = document.getElementById('inputCodeContent');
+    const selectBarcodeFormat = document.getElementById('selectBarcodeFormat');
+    const barcodeFormatGroup = document.getElementById('barcodeFormatGroup');
+    const inputStrokeWidth = document.getElementById('inputStrokeWidth');
+    const selectFillShape = document.getElementById('selectFillShape');
+    const inputRoundRectRadius = document.getElementById('inputRoundRectRadius');
+    const roundRectRadiusGroup = document.getElementById('roundRectRadiusGroup');
+
+    // Sidebar Layer Control Buttons in prop panel
+    const btnPropMoveUp = document.getElementById('btnPropMoveUp');
+    const btnPropMoveDown = document.getElementById('btnPropMoveDown');
+    const btnPropDuplicate = document.getElementById('btnPropDuplicate');
+    const btnPropDelete = document.getElementById('btnPropDelete');
+
+    // General Action Buttons
+    const btnUndo = document.getElementById('btnUndo');
+    const btnRedo = document.getElementById('btnRedo');
+    const btnClearAll = document.getElementById('btnClearAll');
+
+    // Import/Export
+    const btnExportConfig = document.getElementById('btnExportConfig');
+    const btnImportConfigClick = document.getElementById('btnImportConfigClick');
+    const fileImportConfig = document.getElementById('fileImportConfig');
+    const btnResetFactory = document.getElementById('btnResetFactory');
+    const inputTemplateName = document.getElementById('inputTemplateName');
+    const btnSaveTemplate = document.getElementById('btnSaveTemplate');
+    const savedTemplatesList = document.getElementById('savedTemplatesList');
+
+    // Zoom buttons
+    const btnZoomOut = document.getElementById('btnZoomOut');
+    const btnZoomIn = document.getElementById('btnZoomIn');
+    const lblZoom = document.getElementById('lblZoom');
+
+    // Printing progress overlay
+    const printOverlay = document.getElementById('printOverlay');
+    const printProgressBar = document.getElementById('printProgressBar');
+    const printProgressTitle = document.getElementById('printProgressTitle');
+    const printProgressSub = document.getElementById('printProgressSub');
+    const btnCancelPrint = document.getElementById('btnCancelPrint');
+
+    // Initialize Page
+    document.addEventListener('DOMContentLoaded', () => {
+      // 0. Set App Version
+      document.getElementById('appVersion').textContent = APP_VERSION;
+
+      // 1. Service Worker Registration
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('./sw.js')
+          .then(() => console.log('Service Worker Registered'))
+          .catch(err => console.warn('Service Worker registration failed:', err));
+      }
+
+      // 2. Load settings, draft and templates from localStorage
+      loadSettingsFromStorage();
+      loadDraftFromStorage();
+      loadTemplatesList();
+
+      // 3. Init canvas layout and refresh UI
+      updateCanvasSize();
+      pushHistory();
+      render();
+
+      // 4. Attach event listeners
+      setupEventListeners();
+    });
+
+    // Helper functions for settings storage
+    function loadSettingsFromStorage() {
+      const stored = localStorage.getItem('sticker_printer_settings');
+      if (stored) {
+        try {
+          const loaded = JSON.parse(stored);
+          settings = { ...settings, ...loaded };
+          
+          // Apply to UI values
+          selectPaperWidth.value = settings.paperWidthMM;
+          inputMarginLeft.value = settings.marginLeftMM;
+          inputMarginRight.value = settings.marginRightMM;
+          inputFeedLength.value = settings.feedLengthMM;
+          selectHeightMode.value = settings.heightMode;
+          inputLabelHeight.value = settings.labelHeightMM;
+          
+          lblMarginLeft.textContent = settings.marginLeftMM + ' mm';
+          lblMarginRight.textContent = settings.marginRightMM + ' mm';
+          
+          if (settings.heightMode === 'fixed') {
+            fixedHeightGroup.classList.remove('hidden');
+          } else {
+            fixedHeightGroup.classList.add('hidden');
+          }
+        } catch(e) {
+          console.error("Erreur de chargement des réglages", e);
+        }
+      }
+    }
+
+    function saveSettingsToStorage() {
+      localStorage.setItem('sticker_printer_settings', JSON.stringify(settings));
+    }
+
+    function saveDraftToStorage() {
+      const serializedElements = elements.map(el => {
+        const copy = { ...el };
+        if (el.type === 'image') {
+          delete copy.imageObj;
+        }
+        return copy;
+      });
+      localStorage.setItem('sticker_printer_draft_elements', JSON.stringify(serializedElements));
+    }
+
+    function loadDraftFromStorage() {
+      const stored = localStorage.getItem('sticker_printer_draft_elements');
+      if (stored) {
+        try {
+          const serializedElements = JSON.parse(stored);
+          elements = [];
+          let imagesToLoadCount = 0;
+          let imagesLoadedCount = 0;
+          
+          const finalizeLoad = () => {
+            selectedElementIndex = -1;
+            updateCanvasSize();
+            updatePropertyPanel();
+            render();
+          };
+
+          serializedElements.forEach((el) => {
+            const copy = { ...el };
+            elements.push(copy);
+            if (el.type === 'image' && el.src) {
+              imagesToLoadCount++;
+              const img = new Image();
+              img.onload = function() {
+                copy.imageObj = img;
+                imagesLoadedCount++;
+                if (imagesLoadedCount === imagesToLoadCount) {
+                  finalizeLoad();
+                }
+              };
+              img.src = el.src;
+            }
+          });
+
+          if (imagesToLoadCount === 0) {
+            finalizeLoad();
+          }
+        } catch(e) {
+          console.error("Erreur de chargement du brouillon", e);
+        }
+      }
+    }
+
+    function resetFactory() {
+      if (confirm("Voulez-vous réinitialiser TOUS les réglages et modèles aux paramètres d'usine ? Cette action effacera également vos créations en cours.")) {
+        localStorage.removeItem('sticker_printer_settings');
+        localStorage.removeItem('sticker_printer_draft_elements');
+        localStorage.removeItem('phomemo_saved_templates');
+        window.location.reload();
+      }
+    }
+
+    // Dynamic Canvas Resizing based on settings
+    function updateCanvasSize() {
+      const paperWidthMM = parseFloat(settings.paperWidthMM);
+      const totalWidthPx = Math.round(paperWidthMM * PIXEL_RATIO);
+      
+      // Calculate printable area
+      const leftMarginPx = Math.round(parseFloat(settings.marginLeftMM) * PIXEL_RATIO);
+      const rightMarginPx = Math.round(parseFloat(settings.marginRightMM) * PIXEL_RATIO);
+      
+      // Total printable width (must be multiple of 8 for binary encoding)
+      let printableWidthPx = totalWidthPx - (leftMarginPx + rightMarginPx);
+      printableWidthPx = Math.max(8, Math.floor(printableWidthPx / 8) * 8); // Align to byte boundary
+      
+      // Compute total width based on margins and printable bytes
+      // To keep visual representation accurate:
+      canvas.width = printableWidthPx + leftMarginPx + rightMarginPx;
+      
+      // Height calculation
+      if (settings.heightMode === 'fixed') {
+        const heightMM = parseFloat(settings.labelHeightMM);
+        canvas.height = Math.round(heightMM * PIXEL_RATIO);
+      } else {
+        // Continuous mode: dynamically determine height based on elements
+        let maxBottom = 150; // Minimum default canvas height in pixels
+        elements.forEach(el => {
+          const bottom = el.y + el.height;
+          if (bottom > maxBottom) {
+            maxBottom = bottom;
+          }
+        });
+        canvas.height = Math.max(150, maxBottom + 20); // add padding at the bottom
+      }
+
+      // Apply Zoom scaling to the wrapper div
+      canvasWrapper.style.width = (canvas.width * zoomLevel) + 'px';
+      canvasWrapper.style.height = (canvas.height * zoomLevel) + 'px';
+      canvas.style.transform = `scale(${zoomLevel})`;
+      canvas.style.transformOrigin = 'top left';
+      canvas.style.width = '100%';
+      canvas.style.height = '100%';
+    }
+
+    // Set up event listeners for inputs
+    function setupEventListeners() {
+      // Paper parameters change
+      selectPaperWidth.addEventListener('change', (e) => {
+        settings.paperWidthMM = parseInt(e.target.value);
+        // Set standard margins based on width
+        if (settings.paperWidthMM === 53) {
+          settings.marginLeftMM = 0;
+          settings.marginRightMM = 3;
+        } else {
+          settings.marginLeftMM = 0;
+          settings.marginRightMM = 0;
+        }
+        inputMarginLeft.value = settings.marginLeftMM;
+        inputMarginRight.value = settings.marginRightMM;
+        lblMarginLeft.textContent = settings.marginLeftMM + ' mm';
+        lblMarginRight.textContent = settings.marginRightMM + ' mm';
+        
+        saveSettingsToStorage();
+        updateCanvasSize();
+        render();
+      });
+
+      // Quick margins
+      btnMarginOfficial.addEventListener('click', () => {
+        settings.marginLeftMM = 0;
+        settings.marginRightMM = 3;
+        inputMarginLeft.value = 0;
+        inputMarginRight.value = 3;
+        lblMarginLeft.textContent = '0 mm';
+        lblMarginRight.textContent = '3 mm';
+        saveSettingsToStorage();
+        updateCanvasSize();
+        render();
+      });
+
+      btnMarginBorderless.addEventListener('click', () => {
+        settings.marginLeftMM = 0;
+        settings.marginRightMM = 0;
+        inputMarginLeft.value = 0;
+        inputMarginRight.value = 0;
+        lblMarginLeft.textContent = '0 mm';
+        lblMarginRight.textContent = '0 mm';
+        saveSettingsToStorage();
+        updateCanvasSize();
+        render();
+      });
+
+      inputMarginLeft.addEventListener('input', (e) => {
+        settings.marginLeftMM = parseFloat(e.target.value);
+        lblMarginLeft.textContent = settings.marginLeftMM + ' mm';
+        saveSettingsToStorage();
+        updateCanvasSize();
+        render();
+      });
+
+      inputMarginRight.addEventListener('input', (e) => {
+        settings.marginRightMM = parseFloat(e.target.value);
+        lblMarginRight.textContent = settings.marginRightMM + ' mm';
+        saveSettingsToStorage();
+        updateCanvasSize();
+        render();
+      });
+
+      inputFeedLength.addEventListener('change', (e) => {
+        settings.feedLengthMM = Math.max(0, parseInt(e.target.value) || 0);
+        saveSettingsToStorage();
+      });
+
+      selectHeightMode.addEventListener('change', (e) => {
+        settings.heightMode = e.target.value;
+        if (settings.heightMode === 'fixed') {
+          fixedHeightGroup.classList.remove('hidden');
+        } else {
+          fixedHeightGroup.classList.add('hidden');
+        }
+        saveSettingsToStorage();
+        updateCanvasSize();
+        render();
+      });
+
+      inputLabelHeight.addEventListener('change', (e) => {
+        settings.labelHeightMM = Math.max(1, parseInt(e.target.value) || 50);
+        saveSettingsToStorage();
+        updateCanvasSize();
+        render();
+      });
+
+      // Connect Bluetooth Device
+      btnConnect.addEventListener('click', connectPrinter);
+
+      // Print Button
+      btnPrint.addEventListener('click', () => {
+        printLabel();
+      });
+
+      btnFeedManual.addEventListener('click', () => {
+        sendManualFeed();
+      });
+
+      // Toolbar Add Elements
+      btnAddText.addEventListener('click', () => addElement('text'));
+      btnAddImage.addEventListener('click', () => fileImageUpload.click());
+      fileImageUpload.addEventListener('change', handleImageUpload);
+      btnAddQR.addEventListener('click', () => addElement('qrcode'));
+      btnAddBarcode.addEventListener('click', () => addElement('barcode'));
+      btnAddRect.addEventListener('click', () => addElement('rectangle'));
+      btnAddRoundRect.addEventListener('click', () => addElement('roundrect'));
+      btnAddCircle.addEventListener('click', () => addElement('circle'));
+      btnAddTriangle.addEventListener('click', () => addElement('triangle'));
+      btnAddLine.addEventListener('click', () => addElement('line'));
+
+      // Property Panel Edits
+      inputTextContent.addEventListener('input', (e) => {
+        updateSelectedElement('text', e.target.value);
+      });
+      selectTextFont.addEventListener('change', (e) => {
+        updateSelectedElement('fontFamily', e.target.value);
+      });
+      inputTextSize.addEventListener('input', (e) => {
+        updateSelectedElement('fontSize', parseInt(e.target.value) || 16);
+      });
+      btnTextBold.addEventListener('click', () => {
+        const el = elements[selectedElementIndex];
+        if (el && el.type === 'text') {
+          updateSelectedElement('bold', !el.bold);
+          btnTextBold.style.backgroundColor = el.bold ? 'var(--accent-dim)' : 'var(--surface-card)';
+        }
+      });
+      btnTextItalic.addEventListener('click', () => {
+        const el = elements[selectedElementIndex];
+        if (el && el.type === 'text') {
+          updateSelectedElement('italic', !el.italic);
+          btnTextItalic.style.backgroundColor = el.italic ? 'var(--accent-dim)' : 'var(--surface-card)';
+        }
+      });
+
+      selectDithering.addEventListener('change', (e) => {
+        updateSelectedElement('dithering', e.target.value);
+        if (e.target.value === 'threshold') {
+          thresholdGroup.classList.remove('hidden');
+        } else {
+          thresholdGroup.classList.add('hidden');
+        }
+      });
+      inputThreshold.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value);
+        lblThresholdVal.textContent = val;
+        updateSelectedElement('threshold', val);
+      });
+      inputContrast.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value);
+        lblContrastVal.textContent = (val > 0 ? '+' : '') + val + '%';
+        updateSelectedElement('contrast', val);
+      });
+      inputBrightness.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value);
+        lblBrightnessVal.textContent = (val > 0 ? '+' : '') + val + '%';
+        updateSelectedElement('brightness', val);
+      });
+
+      inputCodeContent.addEventListener('input', (e) => {
+        updateSelectedElement('content', e.target.value);
+      });
+      selectBarcodeFormat.addEventListener('change', (e) => {
+        updateSelectedElement('barcodeFormat', e.target.value);
+      });
+
+      inputStrokeWidth.addEventListener('input', (e) => {
+        updateSelectedElement('strokeWidth', parseInt(e.target.value) || 2);
+      });
+      inputRoundRectRadius.addEventListener('input', (e) => {
+        updateSelectedElement('borderRadius', parseInt(e.target.value) || 0);
+      });
+      selectFillShape.addEventListener('change', (e) => {
+        updateSelectedElement('fill', e.target.value);
+      });
+
+      // Layer buttons in property panel
+      btnPropMoveUp.addEventListener('click', moveSelectedElementUp);
+      btnPropMoveDown.addEventListener('click', moveSelectedElementDown);
+      btnPropDuplicate.addEventListener('click', duplicateSelectedElement);
+      btnPropDelete.addEventListener('click', deleteSelectedElement);
+
+      // History controls
+      btnUndo.addEventListener('click', undo);
+      btnRedo.addEventListener('click', redo);
+      btnClearAll.addEventListener('click', clearAll);
+
+      // JSON Configuration Import/Export
+      btnExportConfig.addEventListener('click', exportConfig);
+      btnImportConfigClick.addEventListener('click', () => fileImportConfig.click());
+      fileImportConfig.addEventListener('change', importConfig);
+
+      // Saved Templates
+      btnSaveTemplate.addEventListener('click', saveTemplate);
+
+      // Zoom Controls
+      btnZoomOut.addEventListener('click', () => {
+        zoomLevel = Math.max(0.4, zoomLevel - 0.1);
+        lblZoom.textContent = `Zoom: ${Math.round(zoomLevel * 100)}%`;
+        updateCanvasSize();
+        render();
+      });
+      btnZoomIn.addEventListener('click', () => {
+        zoomLevel = Math.min(3.0, zoomLevel + 0.1);
+        lblZoom.textContent = `Zoom: ${Math.round(zoomLevel * 100)}%`;
+        updateCanvasSize();
+        render();
+      });
+
+      // Printing cancellation
+      btnCancelPrint.addEventListener('click', () => {
+        isPrintingCancelled = true;
+      });
+
+      // Interactive Canvas Events (Native drag and drop / resize)
+      canvas.addEventListener('mousedown', handleCanvasMouseDown);
+      canvas.addEventListener('mousemove', handleCanvasMouseMove);
+      window.addEventListener('mouseup', handleCanvasMouseUp);
+
+      // Touch support for mobile devices
+      canvas.addEventListener('touchstart', (e) => {
+        const touch = e.touches[0];
+        const rect = canvas.getBoundingClientRect();
+        const clientX = (touch.clientX - rect.left) / zoomLevel;
+        const clientY = (touch.clientY - rect.top) / zoomLevel;
+        handlePointerDown(clientX, clientY);
+      });
+      canvas.addEventListener('touchmove', (e) => {
+        if (!isDragging && !isResizing) return;
+        e.preventDefault();
+        const touch = e.touches[0];
+        const rect = canvas.getBoundingClientRect();
+        const clientX = (touch.clientX - rect.left) / zoomLevel;
+        const clientY = (touch.clientY - rect.top) / zoomLevel;
+        handlePointerMove(clientX, clientY);
+      });
+      window.addEventListener('touchend', () => {
+        handleCanvasMouseUp();
+      });
+
+      // Shortcuts keys
+      window.addEventListener('keydown', (e) => {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+        
+        if (e.metaKey || e.ctrlKey) {
+          if (e.key === 'z') {
+            e.preventDefault();
+            undo();
+          } else if (e.key === 'y') {
+            e.preventDefault();
+            redo();
+          }
+        } else if (e.key === 'Delete' || e.key === 'Backspace') {
+          deleteSelectedElement();
+        }
+      });
+    }
+
+    // Connect via Web Bluetooth
+    async function connectPrinter() {
+      statusText.textContent = "Recherche...";
+      statusDot.className = "status-dot connecting";
+      
+      try {
+        printerDevice = await navigator.bluetooth.requestDevice({
+          acceptAllDevices: true,
+          optionalServices: [0xFF00]
+        });
+
+        printerDevice.addEventListener('gattserverdisconnected', onPrinterDisconnected);
+
+        statusText.textContent = "Connexion...";
+        const server = await printerDevice.gatt.connect();
+        
+        const service = await server.getPrimaryService(0xFF00);
+        printerCharacteristic = await service.getCharacteristic(0xFF02);
+
+        statusText.textContent = printerDevice.name || "Phomemo M02S";
+        statusDot.className = "status-dot connected";
+        btnConnect.querySelector('span').textContent = "Déconnecter";
+        btnConnect.classList.remove('primary');
+        btnPrint.disabled = false;
+        
+        console.log("Connecté à l'imprimante : " + printerDevice.name);
+      } catch (err) {
+        console.error("Échec de connexion Bluetooth:", err);
+        onPrinterDisconnected();
+      }
+    }
+
+    function onPrinterDisconnected() {
+      printerDevice = null;
+      printerCharacteristic = null;
+      statusText.textContent = "Non connecté";
+      statusDot.className = "status-dot";
+      btnConnect.querySelector('span').textContent = "Connexion";
+      btnConnect.classList.add('primary');
+      btnPrint.disabled = true;
+    }
+
+    // Element Management
+    function addElement(type) {
+      // Default positions and dimensions
+      const startX = Math.round(canvas.width / 4);
+      const startY = Math.round(canvas.height / 4);
+      let el = {
+        type: type,
+        x: startX,
+        y: startY,
+        width: 100,
+        height: 40,
+        rotation: 0
+      };
+
+      if (type === 'text') {
+        el.text = 'Double-cliquez';
+        el.fontSize = 24;
+        el.fontFamily = 'Inter';
+        el.bold = false;
+        el.italic = false;
+        el.width = 160;
+        el.height = 36;
+      } else if (type === 'qrcode') {
+        el.content = 'https://google.com';
+        el.width = 80;
+        el.height = 80;
+      } else if (type === 'barcode') {
+        el.content = '12345678';
+        el.barcodeFormat = 'CODE128';
+        el.width = 160;
+        el.height = 60;
+      } else if (type === 'rectangle') {
+        el.width = 100;
+        el.height = 60;
+        el.strokeWidth = 2;
+        el.fill = 'transparent';
+      } else if (type === 'roundrect') {
+        el.width = 100;
+        el.height = 60;
+        el.strokeWidth = 2;
+        el.fill = 'transparent';
+        el.borderRadius = 10;
+      } else if (type === 'circle') {
+        el.width = 80;
+        el.height = 80;
+        el.strokeWidth = 2;
+        el.fill = 'transparent';
+      } else if (type === 'triangle') {
+        el.width = 80;
+        el.height = 80;
+        el.strokeWidth = 2;
+        el.fill = 'transparent';
+      } else if (type === 'line') {
+        el.width = 120;
+        el.height = 10;
+        el.strokeWidth = 3;
+      }
+
+      elements.push(el);
+      selectedElementIndex = elements.length - 1;
+      pushHistory();
+      updateCanvasSize();
+      updatePropertyPanel();
+      render();
+    }
+
+    function handleImageUpload(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        const img = new Image();
+        img.onload = function() {
+          // Adjust image size to fit canvas, maintaining aspect ratio
+          const maxW = Math.round(canvas.width * 0.7);
+          let w = img.width;
+          let h = img.height;
+          if (w > maxW) {
+            h = Math.round((maxW / w) * h);
+            w = maxW;
+          }
+
+          const startX = Math.round((canvas.width - w) / 2);
+          const startY = Math.round((canvas.height - h) / 4);
+
+          const el = {
+            type: 'image',
+            x: startX,
+            y: startY,
+            width: w,
+            height: h,
+            rotation: 0,
+            imageObj: img,
+            src: event.target.result, // save base64 for history/templates
+            dithering: 'atkinson',
+            contrast: 0,
+            brightness: 0,
+            threshold: 128
+          };
+
+          elements.push(el);
+          selectedElementIndex = elements.length - 1;
+          pushHistory();
+          updateCanvasSize();
+          updatePropertyPanel();
+          render();
+        };
+        img.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+      e.target.value = ''; // Reset input
+    }
+
+    // Pointer event handlers for drawing and manipulation
+    function handleCanvasMouseDown(e) {
+      const rect = canvas.getBoundingClientRect();
+      const clientX = (e.clientX - rect.left) / zoomLevel;
+      const clientY = (e.clientY - rect.top) / zoomLevel;
+      handlePointerDown(clientX, clientY);
+    }
+
+    function handlePointerDown(x, y) {
+      isDragging = false;
+      isResizing = false;
+
+      // Check if we clicked on the resize handle of the selected element
+      if (selectedElementIndex !== -1) {
+        const el = elements[selectedElementIndex];
+        const handleX = el.x + el.width;
+        const handleY = el.y + el.height;
+        const dist = Math.hypot(x - handleX, y - handleY);
+        
+        if (dist <= resizeHandleSize) {
+          isResizing = true;
+          activeResizeHandle = 'br';
+          dragStartX = x;
+          dragStartY = y;
+          initialResizeWidth = el.width;
+          initialResizeHeight = el.height;
+          return;
+        }
+      }
+
+      // Check if we clicked inside any element (ordered top to bottom)
+      for (let i = elements.length - 1; i >= 0; i--) {
+        const el = elements[i];
+        if (x >= el.x && x <= el.x + el.width && y >= el.y && y <= el.y + el.height) {
+          selectedElementIndex = i;
+          isDragging = true;
+          dragStartX = x;
+          dragStartY = y;
+          dragOffsetLeft = el.x;
+          dragOffsetTop = el.y;
+          updatePropertyPanel();
+          render();
+          return;
+        }
+      }
+
+      // Clicked on empty space
+      selectedElementIndex = -1;
+      updatePropertyPanel();
+      render();
+    }
+
+    function handleCanvasMouseMove(e) {
+      if (!isDragging && !isResizing) return;
+      
+      const rect = canvas.getBoundingClientRect();
+      const clientX = (e.clientX - rect.left) / zoomLevel;
+      const clientY = (e.clientY - rect.top) / zoomLevel;
+      handlePointerMove(clientX, clientY);
+    }
+
+    function handlePointerMove(x, y) {
+      if (selectedElementIndex === -1) return;
+
+      const el = elements[selectedElementIndex];
+
+      if (isDragging) {
+        const dx = x - dragStartX;
+        const dy = y - dragStartY;
+        
+        // Grid snapping (5px snapping)
+        el.x = Math.round((dragOffsetLeft + dx) / 5) * 5;
+        el.y = Math.round((dragOffsetTop + dy) / 5) * 5;
+        
+        // Boundaries checks
+        el.x = Math.max(-el.width + 10, Math.min(canvas.width - 10, el.x));
+        el.y = Math.max(-el.height + 10, Math.min(canvas.height - 10, el.y));
+
+        if (settings.heightMode === 'auto') {
+          updateCanvasSize();
+        }
+        render();
+      } else if (isResizing) {
+        const dx = x - dragStartX;
+        const dy = y - dragStartY;
+        
+        let newWidth = initialResizeWidth + dx;
+        let newHeight = initialResizeHeight + dy;
+
+        // Aspect ratio lock for codes and images
+        if (el.type === 'qrcode' || el.type === 'barcode' || el.type === 'image') {
+          const ratio = initialResizeWidth / initialResizeHeight;
+          if (Math.abs(dx) > Math.abs(dy)) {
+            newWidth = Math.max(20, newWidth);
+            newHeight = Math.round(newWidth / ratio);
+          } else {
+            newHeight = Math.max(20, newHeight);
+            newWidth = Math.round(newHeight * ratio);
+          }
+        } else {
+          newWidth = Math.max(10, newWidth);
+          newHeight = Math.max(10, newHeight);
+        }
+
+        el.width = Math.round(newWidth);
+        el.height = Math.round(newHeight);
+
+        if (settings.heightMode === 'auto') {
+          updateCanvasSize();
+        }
+        render();
+      }
+    }
+
+    function handleCanvasMouseUp() {
+      if (isDragging || isResizing) {
+        isDragging = false;
+        isResizing = false;
+        pushHistory();
+      }
+    }
+
+    // Property panel synchronization
+    function updatePropertyPanel() {
+      if (selectedElementIndex === -1) {
+        propPanelEmpty.classList.remove('hidden');
+        propPanelActive.classList.add('hidden');
+        renderLayersList();
+        return;
+      }
+
+      propPanelEmpty.classList.add('hidden');
+      propPanelActive.classList.remove('hidden');
+
+      const el = elements[selectedElementIndex];
+
+      // Hide all dynamic property sections first
+      propSectionText.classList.add('hidden');
+      propSectionImage.classList.add('hidden');
+      propSectionCode.classList.add('hidden');
+      propSectionShape.classList.add('hidden');
+
+      if (el.type === 'text') {
+        propSectionText.classList.remove('hidden');
+        inputTextContent.value = el.text;
+        selectTextFont.value = el.fontFamily || 'Inter';
+        inputTextSize.value = el.fontSize || 24;
+        btnTextBold.style.backgroundColor = el.bold ? 'var(--accent-dim)' : 'var(--surface-card)';
+        btnTextItalic.style.backgroundColor = el.italic ? 'var(--accent-dim)' : 'var(--surface-card)';
+      } else if (el.type === 'image') {
+        propSectionImage.classList.remove('hidden');
+        selectDithering.value = el.dithering || 'atkinson';
+        inputThreshold.value = el.threshold !== undefined ? el.threshold : 128;
+        lblThresholdVal.textContent = inputThreshold.value;
+        if (el.dithering === 'threshold') {
+          thresholdGroup.classList.remove('hidden');
+        } else {
+          thresholdGroup.classList.add('hidden');
+        }
+        inputContrast.value = el.contrast || 0;
+        lblContrastVal.textContent = (el.contrast > 0 ? '+' : '') + (el.contrast || 0) + '%';
+        inputBrightness.value = el.brightness || 0;
+        lblBrightnessVal.textContent = (el.brightness > 0 ? '+' : '') + (el.brightness || 0) + '%';
+      } else if (el.type === 'qrcode' || el.type === 'barcode') {
+        propSectionCode.classList.remove('hidden');
+        inputCodeContent.value = el.content;
+        if (el.type === 'barcode') {
+          barcodeFormatGroup.classList.remove('hidden');
+          selectBarcodeFormat.value = el.barcodeFormat || 'CODE128';
+        } else {
+          barcodeFormatGroup.classList.add('hidden');
+        }
+      } else if (el.type === 'rectangle' || el.type === 'roundrect' || el.type === 'circle' || el.type === 'triangle' || el.type === 'line') {
+        propSectionShape.classList.remove('hidden');
+        inputStrokeWidth.value = el.strokeWidth || 2;
+        if (el.type === 'roundrect') {
+          roundRectRadiusGroup.classList.remove('hidden');
+          inputRoundRectRadius.value = el.borderRadius || 10;
+        } else {
+          roundRectRadiusGroup.classList.add('hidden');
+        }
+        if (el.type === 'line') {
+          fillShapeGroup.classList.add('hidden');
+        } else {
+          fillShapeGroup.classList.remove('hidden');
+          selectFillShape.value = el.fill || 'transparent';
+        }
+      }
+
+      renderLayersList();
+    }
+
+    function updateSelectedElement(property, value) {
+      if (selectedElementIndex === -1) return;
+      elements[selectedElementIndex][property] = value;
+      render();
+    }
+
+    // Layer stack operations
+    function moveSelectedElementUp() {
+      if (selectedElementIndex === -1 || selectedElementIndex === elements.length - 1) return;
+      const el = elements[selectedElementIndex];
+      elements.splice(selectedElementIndex, 1);
+      elements.splice(selectedElementIndex + 1, 0, el);
+      selectedElementIndex++;
+      pushHistory();
+      updatePropertyPanel();
+      render();
+    }
+
+    function moveSelectedElementDown() {
+      if (selectedElementIndex === -1 || selectedElementIndex === 0) return;
+      const el = elements[selectedElementIndex];
+      elements.splice(selectedElementIndex, 1);
+      elements.splice(selectedElementIndex - 1, 0, el);
+      selectedElementIndex--;
+      pushHistory();
+      updatePropertyPanel();
+      render();
+    }
+
+    function duplicateSelectedElement() {
+      if (selectedElementIndex === -1) return;
+      const src = elements[selectedElementIndex];
+      
+      // Clone object
+      const clone = { ...src, x: src.x + 10, y: src.y + 10 };
+      
+      // Keep image reference
+      if (src.imageObj) {
+        clone.imageObj = src.imageObj;
+      }
+      
+      elements.push(clone);
+      selectedElementIndex = elements.length - 1;
+      pushHistory();
+      updatePropertyPanel();
+      render();
+    }
+
+    function deleteSelectedElement() {
+      if (selectedElementIndex === -1) return;
+      elements.splice(selectedElementIndex, 1);
+      selectedElementIndex = -1;
+      pushHistory();
+      updateCanvasSize();
+      updatePropertyPanel();
+      render();
+    }
+
+    // Render Canvas
+    function render() {
+      // Clear main editing canvas
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Draw active elements
+      elements.forEach((el, index) => {
+        ctx.save();
+        
+        if (el.type === 'text') {
+          // Draw text
+          ctx.fillStyle = '#000000';
+          let fontStyle = '';
+          if (el.italic) fontStyle += 'italic ';
+          if (el.bold) fontStyle += 'bold ';
+          ctx.font = `${fontStyle}${el.fontSize}px "${el.fontFamily}"`;
+          ctx.textBaseline = 'top';
+          
+          // Word wrapping if needed, but for simplicity, we support single & double lines.
+          const text = el.text || '';
+          ctx.fillText(text, el.x, el.y);
+          
+          // Auto width/height adjustment for selection box based on text metrics
+          const metrics = ctx.measureText(text);
+          el.width = Math.max(20, Math.round(metrics.width));
+          // Height is roughly proportional to font size
+          el.height = Math.round(el.fontSize * 1.15);
+          
+        } else if (el.type === 'image' && el.imageObj) {
+          // Apply filters dynamically on local temporary canvas if needed, or draw simple preview
+          // For editing preview, we draw the original or contrast adjusted image
+          ctx.drawImage(el.imageObj, el.x, el.y, el.width, el.height);
+          
+        } else if (el.type === 'qrcode') {
+          try {
+            const qr = qrcode(0, 'M');
+            qr.addData(el.content || ' ');
+            qr.make();
+            const moduleCount = qr.getModuleCount();
+            const cellW = el.width / moduleCount;
+            const cellH = el.height / moduleCount;
+
+            ctx.fillStyle = '#000000';
+            for (let r = 0; r < moduleCount; r++) {
+              for (let c = 0; c < moduleCount; c++) {
+                if (qr.isDark(r, c)) {
+                  ctx.fillRect(
+                    Math.round(el.x + c * cellW),
+                    Math.round(el.y + r * cellH),
+                    Math.ceil(cellW),
+                    Math.ceil(cellH)
+                  );
+                }
+              }
+            }
+          } catch (e) {
+            ctx.fillStyle = '#000000';
+            ctx.strokeRect(el.x, el.y, el.width, el.height);
+            ctx.font = '10px sans-serif';
+            ctx.fillText('QR Error', el.x + 5, el.y + 15);
+          }
+        } else if (el.type === 'barcode') {
+          try {
+            const tempCanvas = document.createElement('canvas');
+            JsBarcode(tempCanvas, el.content || '0', {
+              format: el.barcodeFormat,
+              width: 2,
+              height: 40,
+              displayValue: true,
+              margin: 0
+            });
+            ctx.drawImage(tempCanvas, el.x, el.y, el.width, el.height);
+          } catch(e) {
+            ctx.strokeStyle = '#000000';
+            ctx.strokeRect(el.x, el.y, el.width, el.height);
+            ctx.fillStyle = '#000000';
+            ctx.font = '10px sans-serif';
+            ctx.fillText('Barcode Error', el.x + 5, el.y + 15);
+          }
+        } else if (el.type === 'rectangle') {
+          ctx.strokeStyle = '#000000';
+          ctx.lineWidth = el.strokeWidth || 2;
+          if (el.fill !== 'transparent') {
+            ctx.fillStyle = el.fill === 'white' ? '#ffffff' : '#000000';
+            ctx.fillRect(el.x, el.y, el.width, el.height);
+          }
+          ctx.strokeRect(el.x, el.y, el.width, el.height);
+        } else if (el.type === 'roundrect') {
+          ctx.strokeStyle = '#000000';
+          ctx.lineWidth = el.strokeWidth || 2;
+          ctx.beginPath();
+          const r = el.borderRadius !== undefined ? el.borderRadius : 10;
+          ctx.roundRect(el.x, el.y, el.width, el.height, r);
+          if (el.fill !== 'transparent') {
+            ctx.fillStyle = el.fill === 'white' ? '#ffffff' : '#000000';
+            ctx.fill();
+          }
+          ctx.stroke();
+        } else if (el.type === 'circle') {
+          ctx.strokeStyle = '#000000';
+          ctx.lineWidth = el.strokeWidth || 2;
+          const r = el.width / 2;
+          ctx.beginPath();
+          ctx.arc(el.x + r, el.y + r, r - ctx.lineWidth/2, 0, Math.PI * 2);
+          if (el.fill !== 'transparent') {
+            ctx.fillStyle = el.fill === 'white' ? '#ffffff' : '#000000';
+            ctx.fill();
+          }
+          ctx.stroke();
+        } else if (el.type === 'triangle') {
+          ctx.strokeStyle = '#000000';
+          ctx.lineWidth = el.strokeWidth || 2;
+          ctx.beginPath();
+          ctx.moveTo(el.x + el.width / 2, el.y);
+          ctx.lineTo(el.x + el.width, el.y + el.height);
+          ctx.lineTo(el.x, el.y + el.height);
+          ctx.closePath();
+          if (el.fill !== 'transparent') {
+            ctx.fillStyle = el.fill === 'white' ? '#ffffff' : '#000000';
+            ctx.fill();
+          }
+          ctx.stroke();
+        } else if (el.type === 'line') {
+          ctx.strokeStyle = '#000000';
+          ctx.lineWidth = el.strokeWidth || 3;
+          ctx.beginPath();
+          ctx.moveTo(el.x, el.y + el.height/2);
+          ctx.lineTo(el.x + el.width, el.y + el.height/2);
+          ctx.stroke();
+        }
+
+        ctx.restore();
+      });
+
+      // Draw grid overlay for non-printable margins (translucent diagonal lines)
+      const leftMarginPx = Math.round(parseFloat(settings.marginLeftMM) * PIXEL_RATIO);
+      const rightMarginPx = Math.round(parseFloat(settings.marginRightMM) * PIXEL_RATIO);
+
+      ctx.save();
+      ctx.fillStyle = 'rgba(220, 38, 38, 0.15)';
+      ctx.strokeStyle = 'rgba(220, 38, 38, 0.4)';
+      ctx.lineWidth = 1;
+
+      // Draw left margin mask
+      if (leftMarginPx > 0) {
+        ctx.fillRect(0, 0, leftMarginPx, canvas.height);
+        ctx.beginPath();
+        for (let y = -leftMarginPx; y < canvas.height; y += 12) {
+          ctx.moveTo(0, y);
+          ctx.lineTo(leftMarginPx, y + leftMarginPx);
+        }
+        ctx.stroke();
+      }
+
+      // Draw right margin mask
+      if (rightMarginPx > 0) {
+        const startX = canvas.width - rightMarginPx;
+        ctx.fillRect(startX, 0, rightMarginPx, canvas.height);
+        ctx.beginPath();
+        for (let y = -rightMarginPx; y < canvas.height; y += 12) {
+          ctx.moveTo(startX, y);
+          ctx.lineTo(canvas.width, y + rightMarginPx);
+        }
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      // Highlight active element and draw resize handles
+      if (selectedElementIndex !== -1) {
+        const el = elements[selectedElementIndex];
+        ctx.save();
+        ctx.strokeStyle = 'var(--accent)';
+        ctx.lineWidth = 1.5;
+        // Selection bounding box
+        ctx.strokeRect(el.x - 2, el.y - 2, el.width + 4, el.height + 4);
+        
+        // Resize handle at bottom-right corner
+        ctx.fillStyle = 'var(--accent)';
+        ctx.fillRect(el.x + el.width - resizeHandleSize/2, el.y + el.height - resizeHandleSize/2, resizeHandleSize, resizeHandleSize);
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(el.x + el.width - resizeHandleSize/2, el.y + el.height - resizeHandleSize/2, resizeHandleSize, resizeHandleSize);
+        
+        ctx.restore();
+      }
+    }
+
+    // Render Calques Layer list
+    function renderLayersList() {
+      layersListContainer.innerHTML = '';
+      if (elements.length === 0) {
+        layersListContainer.innerHTML = '<div style="font-size: 0.75rem; color: var(--text-secondary); text-align: center; padding: 1rem;">Aucun élément</div>';
+        return;
+      }
+
+      // Render top-down layers (reverse elements list)
+      for (let i = elements.length - 1; i >= 0; i--) {
+        const el = elements[i];
+        const item = document.createElement('div');
+        item.className = 'layer-item' + (i === selectedElementIndex ? ' active' : '');
+        
+        // Element icon & preview label
+        let iconSvg = '';
+        let labelText = '';
+        if (el.type === 'text') {
+          iconSvg = '<svg viewBox="0 0 24 24"><path d="M5 4v3h5.5v12h3V7H19V4H5z"/></svg>';
+          labelText = el.text ? `"${el.text.slice(0, 10)}"` : 'Texte';
+        } else if (el.type === 'image') {
+          iconSvg = '<svg viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c0 1.1-.9-2-2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>';
+          labelText = 'Image';
+        } else if (el.type === 'qrcode') {
+          iconSvg = '<svg viewBox="0 0 24 24"><path d="M3 11h8V3H3v8zm2-6h4v4H5V5zM3 21h8v-8H3v8zm2-6h4v4H5v-4zm8-12v8h8V3h-8zm6 6h-4V5h4v4zm0 10h2v2h-2zm-6-6h2v2h-2zm2 2h2v2h-2zm-2 2h2v2h-2zm2 2h2v2h-2zm2-2h2v2h-2zm0-4h2v2h-2zm2 2h2v2h-2z"/></svg>';
+          labelText = 'QR Code';
+        } else if (el.type === 'barcode') {
+          iconSvg = '<svg viewBox="0 0 24 24"><path d="M3 5h2v14H3zm4 0h1v14H7zm3 0h2v14h-2zm4 0h1v14h-1zm3 0h3v14h-3z"/></svg>';
+          labelText = 'Code-barres';
+        } else {
+          iconSvg = '<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/></svg>';
+          labelText = el.type === 'rectangle' ? 'Rectangle' :
+                      el.type === 'roundrect' ? 'Rectangle Arrondi' :
+                      el.type === 'circle' ? 'Cercle' :
+                      el.type === 'triangle' ? 'Triangle' : 'Ligne';
+        }
+
+        item.innerHTML = `
+          <div class="layer-item-info">
+            ${iconSvg}
+            <span>${labelText}</span>
+          </div>
+          <div class="layer-actions">
+            <button class="layer-btn delete-btn" title="Supprimer">✕</button>
+          </div>
+        `;
+
+        // Click to select
+        item.addEventListener('click', (e) => {
+          if (e.target.classList.contains('delete-btn')) {
+            selectedElementIndex = i;
+            deleteSelectedElement();
+          } else {
+            selectedElementIndex = i;
+            updatePropertyPanel();
+            render();
+          }
+        });
+
+        layersListContainer.appendChild(item);
+      }
+    }
+
+    // Dithering & Monochrome image raster rendering
+    function generatePrintData() {
+      // 1. Create a canvas matching ONLY the printable area (excluding margins)
+      const leftMarginPx = Math.round(parseFloat(settings.marginLeftMM) * PIXEL_RATIO);
+      const rightMarginPx = Math.round(parseFloat(settings.marginRightMM) * PIXEL_RATIO);
+      const printableWidth = canvas.width - (leftMarginPx + rightMarginPx);
+      
+      const printCanvas = document.createElement('canvas');
+      printCanvas.width = printableWidth;
+      printCanvas.height = canvas.height;
+      const pCtx = printCanvas.getContext('2d');
+
+      // Draw white background
+      pCtx.fillStyle = '#ffffff';
+      pCtx.fillRect(0, 0, printCanvas.width, printCanvas.height);
+
+      // Copy elements offset by leftMarginPx
+      pCtx.drawImage(canvas, leftMarginPx, 0, printableWidth, canvas.height, 0, 0, printableWidth, canvas.height);
+
+      // 2. Read image data
+      const imgData = pCtx.getImageData(0, 0, printCanvas.width, printCanvas.height);
+      const data = imgData.data;
+      const width = imgData.width;
+      const height = imgData.height;
+
+      // Make pixels buffer grayscale
+      const grayscale = new Float32Array(width * height);
+      for (let i = 0; i < data.length; i += 4) {
+        // Luminosity formula
+        grayscale[i / 4] = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
+      }
+
+      // Monochrome 1-bit output
+      const mono = new Uint8Array(width * height);
+
+      // Check dithering mode of the active image elements, or use Atkinson as default global
+      let ditheringMode = 'atkinson';
+      let thresholdVal = 128;
+      
+      // Determine if there is an image selected and get its settings
+      const imageEl = elements.find(el => el.type === 'image');
+      if (imageEl) {
+        ditheringMode = imageEl.dithering || 'atkinson';
+        thresholdVal = imageEl.threshold !== undefined ? imageEl.threshold : 128;
+      }
+
+      if (ditheringMode === 'threshold') {
+        for (let i = 0; i < grayscale.length; i++) {
+          mono[i] = grayscale[i] < thresholdVal ? 1 : 0; // 1 = black, 0 = white
+        }
+      } else if (ditheringMode === 'floyd') {
+        // Floyd-Steinberg Dithering
+        for (let y = 0; y < height; y++) {
+          for (let x = 0; x < width; x++) {
+            const idx = y * width + x;
+            const oldVal = grayscale[idx];
+            const newVal = oldVal < 128 ? 0 : 255;
+            mono[idx] = newVal === 0 ? 1 : 0;
+            const err = oldVal - newVal;
+            
+            if (x + 1 < width) grayscale[idx + 1] += err * 7 / 16;
+            if (y + 1 < height) {
+              if (x - 1 >= 0) grayscale[idx + width - 1] += err * 3 / 16;
+              grayscale[idx + width] += err * 5 / 16;
+              if (x + 1 < width) grayscale[idx + width + 1] += err * 1 / 16;
+            }
+          }
+        }
+      } else {
+        // Atkinson Dithering (Default)
+        for (let y = 0; y < height; y++) {
+          for (let x = 0; x < width; x++) {
+            const idx = y * width + x;
+            const oldVal = grayscale[idx];
+            const newVal = oldVal < 128 ? 0 : 255;
+            mono[idx] = newVal === 0 ? 1 : 0;
+            const err = oldVal - newVal;
+            
+            const e = err / 8;
+            if (x + 1 < width) grayscale[idx + 1] += e;
+            if (x + 2 < width) grayscale[idx + 2] += e;
+            if (y + 1 < height) {
+              if (x - 1 >= 0) grayscale[idx + width - 1] += e;
+              grayscale[idx + width] += e;
+              if (x + 1 < width) grayscale[idx + width + 1] += e;
+            }
+            if (y + 2 < height) {
+              grayscale[idx + 2 * width] += e;
+            }
+          }
+        }
+      }
+
+      // Convert 1-bit pixels to packed bytes (8 pixels per byte)
+      const bytesPerLine = width / 8; // Width is already aligned to multiple of 8
+      const packedData = new Uint8Array(bytesPerLine * height);
+
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const bitIndex = x % 8;
+          const byteIndex = y * bytesPerLine + Math.floor(x / 8);
+          if (mono[y * width + x] === 1) {
+            packedData[byteIndex] |= (0x80 >> bitIndex); // Black pixel set to 1
+          }
+        }
+      }
+
+      return {
+        bytesPerLine: bytesPerLine,
+        heightLines: height,
+        data: packedData
+      };
+    }
+
+    // BLE Helper utility
+    function sleep(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    // Web Bluetooth Printer Driver logic
+    async function printLabel() {
+      if (!printerCharacteristic) {
+        alert("Imprimante non connectée !");
+        return;
+      }
+
+      // Prepare image data
+      selectedElementIndex = -1; // Deselect to avoid drawing boundary box in print
+      render();
+      const printJob = generatePrintData();
+      
+      // Update UI Progress Overlay
+      isPrintingCancelled = false;
+      printOverlay.style.display = 'flex';
+      printProgressBar.style.width = '0%';
+      printProgressTitle.textContent = "Préparation de l'impression...";
+      printProgressSub.textContent = `Génération du bitmap (Largeur : ${printJob.bytesPerLine * 8}px, Hauteur : ${printJob.heightLines}px)`;
+
+      try {
+        // 1. Send initialization commands
+        // ESC @ (Initialize)
+        await printerCharacteristic.writeValue(new Uint8Array([0x1B, 0x40]));
+        // Config commands: Density setting and printing speed setting
+        await printerCharacteristic.writeValue(new Uint8Array([0x1B, 0x61, 0x01])); // center alignment
+        await printerCharacteristic.writeValue(new Uint8Array([0x1F, 0x11, 0x02, 0x04])); // density = 4
+        await sleep(50);
+
+        // 2. Prepare Raster Image Commands: GS v 0 0
+        // Command header
+        const header = new Uint8Array([0x1D, 0x76, 0x30, 0x00]);
+        // Dimensions in little-endian
+        const xL = printJob.bytesPerLine & 0xFF;
+        const xH = (printJob.bytesPerLine >> 8) & 0xFF;
+        const yL = printJob.heightLines & 0xFF;
+        const yH = (printJob.heightLines >> 8) & 0xFF;
+        const dims = new Uint8Array([xL, xH, yL, yH]);
+
+        const fullCommandHeader = new Uint8Array([...header, ...dims]);
+        await printerCharacteristic.writeValue(fullCommandHeader);
+        await sleep(30);
+
+        // 3. Write image data with throttling
+        const rawBytes = printJob.data;
+        const chunkSize = 200; // Chunk size in bytes for BLE transmissions
+        const totalBytes = rawBytes.length;
+        let sentBytes = 0;
+
+        printProgressTitle.textContent = "Impression en cours...";
+
+        while (sentBytes < totalBytes) {
+          if (isPrintingCancelled) {
+            throw new Error("Impression annulée par l'utilisateur");
+          }
+
+          const end = Math.min(sentBytes + chunkSize, totalBytes);
+          const chunk = rawBytes.slice(sentBytes, end);
+          
+          await printerCharacteristic.writeValue(chunk);
+          sentBytes = end;
+
+          // Update progress
+          const progress = Math.round((sentBytes / totalBytes) * 100);
+          printProgressBar.style.width = progress + '%';
+          printProgressSub.textContent = `Lignes envoyées : ${Math.round(sentBytes / printJob.bytesPerLine)} / ${printJob.heightLines}`;
+          
+          // Deliberate throttle sleep to avoid overflow of printer buffer
+          await sleep(18);
+        }
+
+        // 4. Send paper feed command (Feed)
+        printProgressSub.textContent = "Finalisation de la découpe...";
+        const feedMM = parseFloat(settings.feedLengthMM);
+        if (feedMM > 0) {
+          // Calculate lines to feed based on DPI
+          // 300 DPI = 11.81 lines/mm (dots)
+          const feedLines = Math.round(feedMM * PIXEL_RATIO);
+          // Send ESC J [dots] (feed dot lines)
+          let linesRemaining = feedLines;
+          while (linesRemaining > 0) {
+            const feedChunk = Math.min(255, linesRemaining);
+            await printerCharacteristic.writeValue(new Uint8Array([0x1B, 0x4A, feedChunk]));
+            linesRemaining -= feedChunk;
+            await sleep(50);
+          }
+        }
+
+        // 5. Send Shutdown / tasks complete commands
+        await printerCharacteristic.writeValue(new Uint8Array([0x1F, 0x11, 0x08]));
+        await printerCharacteristic.writeValue(new Uint8Array([0x1F, 0x11, 0x0E]));
+        await sleep(50);
+
+        printProgressTitle.textContent = "Impression terminée !";
+        printProgressSub.textContent = "Votre étiquette est prête.";
+        await sleep(800);
+      } catch (err) {
+        console.error("Erreur durant l'impression :", err);
+        alert(err.message || "Une erreur est survenue lors de l'impression.");
+      } finally {
+        printOverlay.style.display = 'none';
+        render(); // Restore selection display
+      }
+    }
+
+    // Manual Feed operation
+    async function sendManualFeed() {
+      if (!printerCharacteristic) {
+        alert("Imprimante non connectée !");
+        return;
+      }
+      try {
+        const feedLines = Math.round(5 * PIXEL_RATIO); // 5mm manual feed per click
+        await printerCharacteristic.writeValue(new Uint8Array([0x1B, 0x4A, feedLines]));
+        console.log("Avancement manuel de 5mm envoyé");
+      } catch (e) {
+        console.error("Échec d'avancement manuel :", e);
+      }
+    }
+
+    // Undo / Redo History stack
+    function pushHistory() {
+      // Deep clone element list
+      const elementsClone = elements.map(el => {
+        const copy = { ...el };
+        if (el.imageObj) copy.imageObj = el.imageObj; // keep same image elements reference
+        return copy;
+      });
+
+      // Truncate stack if we had undone actions
+      history = history.slice(0, historyIndex + 1);
+      history.push(elementsClone);
+      historyIndex++;
+
+      // Cap history depth to 30 steps
+      if (history.length > 30) {
+        history.shift();
+        historyIndex--;
+      }
+
+      // Autosave draft to storage
+      saveDraftToStorage();
+    }
+
+    function undo() {
+      if (historyIndex > 0) {
+        historyIndex--;
+        elements = history[historyIndex].map(el => ({ ...el })); // restore copy
+        selectedElementIndex = -1;
+        updateCanvasSize();
+        updatePropertyPanel();
+        render();
+      }
+    }
+
+    function redo() {
+      if (historyIndex < history.length - 1) {
+        historyIndex++;
+        elements = history[historyIndex].map(el => ({ ...el })); // restore copy
+        selectedElementIndex = -1;
+        updateCanvasSize();
+        updatePropertyPanel();
+        render();
+      }
+    }
+
+    function clearAll() {
+      if (confirm("Voulez-vous supprimer tous les éléments ?")) {
+        elements = [];
+        selectedElementIndex = -1;
+        pushHistory();
+        updateCanvasSize();
+        updatePropertyPanel();
+        render();
+      }
+    }
+
+    // Export/Import configuration JSON file
+    function exportConfig() {
+      const config = {
+        paperWidth: settings.paperWidthMM,
+        marginLeft: settings.marginLeftMM,
+        marginRight: settings.marginRightMM,
+        defaultFeed: settings.feedLengthMM,
+        heightMode: settings.heightMode,
+        labelHeight: settings.labelHeightMM
+      };
+
+      const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `phomemo_config_${settings.paperWidthMM}mm.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    function importConfig(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        try {
+          const config = JSON.parse(event.target.result);
+          
+          if (config.paperWidth !== undefined) settings.paperWidthMM = config.paperWidth;
+          if (config.marginLeft !== undefined) settings.marginLeftMM = config.marginLeft;
+          if (config.marginRight !== undefined) settings.marginRightMM = config.marginRight;
+          if (config.defaultFeed !== undefined) settings.feedLengthMM = config.defaultFeed;
+          if (config.heightMode !== undefined) settings.heightMode = config.heightMode;
+          if (config.labelHeight !== undefined) settings.labelHeightMM = config.labelHeight;
+
+          // Apply to GUI inputs
+          selectPaperWidth.value = settings.paperWidthMM;
+          inputMarginLeft.value = settings.marginLeftMM;
+          inputMarginRight.value = settings.marginRightMM;
+          inputFeedLength.value = settings.feedLengthMM;
+          selectHeightMode.value = settings.heightMode;
+          inputLabelHeight.value = settings.labelHeightMM;
+          
+          lblMarginLeft.textContent = settings.marginLeftMM + ' mm';
+          lblMarginRight.textContent = settings.marginRightMM + ' mm';
+
+          if (settings.heightMode === 'fixed') {
+            fixedHeightGroup.classList.remove('hidden');
+          } else {
+            fixedHeightGroup.classList.add('hidden');
+          }
+
+          saveSettingsToStorage();
+          updateCanvasSize();
+          render();
+          alert("Configuration chargée avec succès !");
+        } catch (err) {
+          alert("Fichier de configuration invalide.");
+        }
+      };
+      reader.readAsText(file);
+      e.target.value = '';
+    }
+
+    // Template management inside localStorage
+    function saveTemplate() {
+      const name = inputTemplateName.value.trim();
+      if (!name) {
+        alert("Veuillez saisir un nom pour le modèle.");
+        return;
+      }
+
+      // Convert elements to serializable objects
+      const serializedElements = elements.map(el => {
+        const copy = { ...el };
+        // If it's an image, keep the base64 source (src) for loading later, delete the canvas Image object ref
+        if (el.type === 'image') {
+          delete copy.imageObj;
+        }
+        return copy;
+      });
+
+      const template = {
+        name: name,
+        settings: settings,
+        elements: serializedElements
+      };
+
+      // Read current templates
+      let templates = [];
+      const stored = localStorage.getItem('phomemo_saved_templates');
+      if (stored) {
+        try { templates = JSON.parse(stored); } catch(e) {}
+      }
+
+      // Overwrite or append
+      const existingIdx = templates.findIndex(t => t.name === name);
+      if (existingIdx !== -1) {
+        if (!confirm(`Un modèle nommé "${name}" existe déjà. Le remplacer ?`)) return;
+        templates[existingIdx] = template;
+      } else {
+        templates.push(template);
+      }
+
+      localStorage.setItem('phomemo_saved_templates', JSON.stringify(templates));
+      inputTemplateName.value = '';
+      loadTemplatesList();
+      alert(`Modèle "${name}" sauvegardé !`);
+    }
+
+    function loadTemplatesList() {
+      savedTemplatesList.innerHTML = '';
+      let templates = [];
+      const stored = localStorage.getItem('phomemo_saved_templates');
+      if (stored) {
+        try { templates = JSON.parse(stored); } catch(e) {}
+      }
+
+      if (templates.length === 0) {
+        savedTemplatesList.innerHTML = '<div style="font-size: 0.75rem; color: var(--text-secondary); text-align: center; padding: 1rem;">Aucun modèle</div>';
+        return;
+      }
+
+      templates.forEach(t => {
+        const item = document.createElement('div');
+        item.className = 'saved-item';
+        item.innerHTML = `
+          <span title="Charger ce modèle">${t.name}</span>
+          <button class="delete-template" title="Supprimer">✕</button>
+        `;
+
+        // Click on template name loads it
+        item.querySelector('span').addEventListener('click', () => {
+          loadTemplate(t);
+        });
+
+        // Click delete template removes it
+        item.querySelector('.delete-template').addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (confirm(`Supprimer le modèle "${t.name}" ?`)) {
+            const filtered = templates.filter(tmpl => tmpl.name !== t.name);
+            localStorage.setItem('phomemo_saved_templates', JSON.stringify(filtered));
+            loadTemplatesList();
+          }
+        });
+
+        savedTemplatesList.appendChild(item);
+      });
+    }
+
+    function loadTemplate(t) {
+      if (!confirm(`Charger le modèle "${t.name}" ? (Cela remplacera votre création en cours)`)) return;
+
+      // Apply settings
+      settings = { ...settings, ...t.settings };
+      selectPaperWidth.value = settings.paperWidthMM;
+      inputMarginLeft.value = settings.marginLeftMM;
+      inputMarginRight.value = settings.marginRightMM;
+      inputFeedLength.value = settings.feedLengthMM;
+      selectHeightMode.value = settings.heightMode;
+      inputLabelHeight.value = settings.labelHeightMM;
+      lblMarginLeft.textContent = settings.marginLeftMM + ' mm';
+      lblMarginRight.textContent = settings.marginRightMM + ' mm';
+
+      if (settings.heightMode === 'fixed') {
+        fixedHeightGroup.classList.remove('hidden');
+      } else {
+        fixedHeightGroup.classList.add('hidden');
+      }
+
+      // Recreate elements
+      elements = [];
+      const elementsToLoad = t.elements || [];
+      let imagesToLoadCount = 0;
+      let imagesLoadedCount = 0;
+
+      // Helper to push history & render after everything is loaded
+      const finalizeLoad = () => {
+        selectedElementIndex = -1;
+        saveSettingsToStorage();
+        updateCanvasSize();
+        updatePropertyPanel();
+        pushHistory();
+        render();
+      };
+
+      elementsToLoad.forEach((el, index) => {
+        const copy = { ...el };
+        elements.push(copy);
+
+        if (el.type === 'image' && el.src) {
+          imagesToLoadCount++;
+          const img = new Image();
+          img.onload = function() {
+            copy.imageObj = img;
+            imagesLoadedCount++;
+            if (imagesLoadedCount === imagesToLoadCount) {
+              finalizeLoad();
+            }
+          };
+          img.src = el.src;
+        }
+      });
+
+      if (imagesToLoadCount === 0) {
+        finalizeLoad();
+      }
+    }
+  </script>
+</body>
+</html>
