@@ -858,7 +858,7 @@
 
   <script>
     // Constants & Configuration
-    const APP_VERSION = 'v1.0.4';
+    const APP_VERSION = 'v1.0.5';
     const DPI = 300;
     const MM_TO_INCH = 25.4;
     const PIXEL_RATIO = DPI / MM_TO_INCH; // dots per mm (approx 11.81 dots/mm)
@@ -1229,27 +1229,26 @@
       }
     }
 
+    function getAlignedMargins() {
+      let leftMarginPx = Math.round(parseFloat(settings.marginLeftMM) * PIXEL_RATIO);
+      leftMarginPx = Math.round(leftMarginPx / 8) * 8;
+      
+      let rightMarginPx = Math.round(parseFloat(settings.marginRightMM) * PIXEL_RATIO);
+      rightMarginPx = Math.round(rightMarginPx / 8) * 8;
+      
+      const printableWidthPx = 624 - leftMarginPx - rightMarginPx;
+      return { leftMarginPx, rightMarginPx, printableWidthPx };
+    }
+
     // Dynamic Canvas Resizing based on settings
     function updateCanvasSize() {
-      // Physical head width in dots = 624
-      const totalWidthPx = 624;
+      const { leftMarginPx, rightMarginPx, printableWidthPx } = getAlignedMargins();
       
-      // Calculate printable area
-      const leftMarginPx = Math.round(parseFloat(settings.marginLeftMM) * PIXEL_RATIO);
-      const rightMarginPx = Math.round(parseFloat(settings.marginRightMM) * PIXEL_RATIO);
-      
-      // Total printable width (must be multiple of 8 for binary encoding)
-      let printableWidthPx = totalWidthPx - (leftMarginPx + rightMarginPx);
-      printableWidthPx = Math.max(8, Math.floor(printableWidthPx / 8) * 8); // Align to byte boundary
-      
-      // Re-align right margin to match exactly
-      const actualRightMarginPx = totalWidthPx - leftMarginPx - printableWidthPx;
-      
-      canvas.width = totalWidthPx;
+      canvas.width = 624;
       
       // Update UI labels if elements exist
-      if (lblMarginLeft) lblMarginLeft.textContent = parseFloat(settings.marginLeftMM).toFixed(1) + ' mm';
-      if (lblMarginRight) lblMarginRight.textContent = (actualRightMarginPx / PIXEL_RATIO).toFixed(1) + ' mm';
+      if (lblMarginLeft) lblMarginLeft.textContent = (leftMarginPx / PIXEL_RATIO).toFixed(1) + ' mm';
+      if (lblMarginRight) lblMarginRight.textContent = (rightMarginPx / PIXEL_RATIO).toFixed(1) + ' mm';
       
       // Height calculation
       if (settings.heightMode === 'fixed') {
@@ -2062,8 +2061,7 @@
       });
 
       // Draw grid overlay for non-printable margins (translucent diagonal lines)
-      const leftMarginPx = Math.round(parseFloat(settings.marginLeftMM) * PIXEL_RATIO);
-      const rightMarginPx = Math.round(parseFloat(settings.marginRightMM) * PIXEL_RATIO);
+      const { leftMarginPx, rightMarginPx } = getAlignedMargins();
 
       ctx.save();
       ctx.fillStyle = 'rgba(220, 38, 38, 0.15)';
@@ -2180,9 +2178,8 @@
     // Dithering & Monochrome image raster rendering
     function generatePrintData() {
       // 1. Create a canvas matching ONLY the printable area (excluding margins)
-      const leftMarginPx = Math.round(parseFloat(settings.marginLeftMM) * PIXEL_RATIO);
-      const rightMarginPx = Math.round(parseFloat(settings.marginRightMM) * PIXEL_RATIO);
-      const printableWidth = canvas.width - (leftMarginPx + rightMarginPx);
+      const { leftMarginPx, rightMarginPx, printableWidthPx } = getAlignedMargins();
+      const printableWidth = printableWidthPx;
       
       const printCanvas = document.createElement('canvas');
       printCanvas.width = printableWidth;
