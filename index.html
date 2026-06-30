@@ -732,12 +732,21 @@
             <button id="btnPropDelete" style="padding: 0.35rem; font-size: 0.75rem; color: var(--danger);" title="Supprimer">Suppr.</button>
           </div>
 
+          <!-- Rotation (applied to all elements) -->
+          <div class="form-group" style="margin-top: 0.2rem; margin-bottom: 0.2rem;">
+            <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.2rem;">
+              <span>Rotation</span>
+              <span id="lblPropRotationVal">0°</span>
+            </div>
+            <input type="range" id="inputPropRotation" min="0" max="360" step="5" value="0">
+          </div>
+
           <!-- Dynamic inputs based on selected element type -->
           <!-- TEXT SECTION -->
           <div id="propSectionText" class="hidden">
             <div class="form-group">
               <label for="inputTextContent">Texte</label>
-              <input type="text" id="inputTextContent">
+              <textarea id="inputTextContent" rows="3" style="width: 100%; padding: 0.35rem; border-radius: 4px; border: 1px solid var(--border); background: var(--surface-card); color: var(--text); resize: vertical;"></textarea>
             </div>
             <div class="form-group">
               <label for="selectTextFont">Police</label>
@@ -755,7 +764,22 @@
                 <input type="number" id="inputTextSize" min="6" max="150" value="24">
               </div>
             </div>
-            <div style="display: flex; gap: 0.5rem;">
+            <div class="form-group">
+              <label for="inputTextWidth">Largeur Cadre (px)</label>
+              <div class="input-row">
+                <input type="number" id="inputTextWidth" min="20" max="624" value="250">
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="selectTextAlign">Alignement</label>
+              <select id="selectTextAlign">
+                <option value="left">Gauche</option>
+                <option value="center">Centré</option>
+                <option value="right">Droite</option>
+                <option value="justify">Justifié</option>
+              </select>
+            </div>
+            <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
               <button id="btnTextBold" style="flex: 1; justify-content: center; padding: 0.4rem;">Gras</button>
               <button id="btnTextItalic" style="flex: 1; justify-content: center; padding: 0.4rem;">Italique</button>
             </div>
@@ -861,7 +885,7 @@
 
   <script>
     // Constants & Configuration
-    const APP_VERSION = 'v1.0.7';
+    const APP_VERSION = 'v1.0.8';
     const DPI = 300;
     const MM_TO_INCH = 25.4;
     const PIXEL_RATIO = DPI / MM_TO_INCH; // dots per mm (approx 11.81 dots/mm)
@@ -885,6 +909,7 @@
     let historyIndex = -1;
     let isPrintingCancelled = false;
     let customPaperPresets = [];
+    let clipboardElement = null;
 
     // Viewport Zoom
     let zoomLevel = 1.0;
@@ -949,6 +974,10 @@
     const inputTextSize = document.getElementById('inputTextSize');
     const btnTextBold = document.getElementById('btnTextBold');
     const btnTextItalic = document.getElementById('btnTextItalic');
+    const inputTextWidth = document.getElementById('inputTextWidth');
+    const selectTextAlign = document.getElementById('selectTextAlign');
+    const inputPropRotation = document.getElementById('inputPropRotation');
+    const lblPropRotationVal = document.getElementById('lblPropRotationVal');
     const selectDithering = document.getElementById('selectDithering');
     const thresholdGroup = document.getElementById('thresholdGroup');
     const inputThreshold = document.getElementById('inputThreshold');
@@ -1402,6 +1431,18 @@
         }
       });
 
+      inputTextWidth.addEventListener('input', (e) => {
+        updateSelectedElement('width', parseInt(e.target.value) || 20);
+      });
+      selectTextAlign.addEventListener('change', (e) => {
+        updateSelectedElement('textAlign', e.target.value);
+      });
+      inputPropRotation.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value) || 0;
+        lblPropRotationVal.textContent = val + '°';
+        updateSelectedElement('rotation', val);
+      });
+
       selectDithering.addEventListener('change', (e) => {
         updateSelectedElement('dithering', e.target.value);
         if (e.target.value === 'threshold') {
@@ -1509,7 +1550,7 @@
 
       // Shortcuts keys
       window.addEventListener('keydown', (e) => {
-        if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
         
         if (e.metaKey || e.ctrlKey) {
           if (e.key === 'z') {
@@ -1518,9 +1559,111 @@
           } else if (e.key === 'y') {
             e.preventDefault();
             redo();
+          } else if (e.key === 'c') {
+            // Copy element to clipboard
+            if (selectedElementIndex !== -1) {
+              clipboardElement = JSON.stringify(elements[selectedElementIndex]);
+            }
+          } else if (e.key === 'v') {
+            // Paste element from clipboard
+            if (clipboardElement) {
+              try {
+                const parsed = JSON.parse(clipboardElement);
+                parsed.id = 'element_' + Date.now();
+                parsed.x += 15;
+                parsed.y += 15;
+                if (parsed.type === 'image' && parsed.src) {
+                  const img = new Image();
+                  img.onload = () => {
+                    parsed.imageObj = img;
+                    elements.push(parsed);
+                    selectedElementIndex = elements.length - 1;
+                    saveDraftToStorage();
+                    updatePropertyPanel();
+                    render();
+                    pushHistory();
+                  };
+                  img.src = parsed.src;
+                } else {
+                  elements.push(parsed);
+                  selectedElementIndex = elements.length - 1;
+                  saveDraftToStorage();
+                  updatePropertyPanel();
+                  render();
+                  pushHistory();
+                }
+              } catch (err) {
+                console.error("Paste error", err);
+              }
+            }
           }
         } else if (e.key === 'Delete' || e.key === 'Backspace') {
           deleteSelectedElement();
+        }
+      });
+
+      // Clipboard Paste handler for files/images
+      window.addEventListener('paste', async (e) => {
+        const items = e.clipboardData.items;
+        for (let i = 0; i < items.length; i++) {
+          if (items[i].type.indexOf('image') !== -1) {
+            const file = items[i].getAsFile();
+            if (file) {
+              const reader = new FileReader();
+              reader.onload = function(event) {
+                const img = new Image();
+                img.onload = function() {
+                  const maxW = 300;
+                  let w = img.width;
+                  let h = img.height;
+                  if (w > maxW) {
+                    h = Math.round((maxW / w) * h);
+                    w = maxW;
+                  }
+                  
+                  const startX = Math.round((canvas.width - w) / 2);
+                  const startY = Math.round((canvas.height - h) / 4);
+
+                  const newEl = {
+                    id: 'element_' + Date.now(),
+                    type: 'image',
+                    x: startX,
+                    y: startY,
+                    width: w,
+                    height: h,
+                    rotation: 0,
+                    imageObj: img,
+                    src: event.target.result,
+                    dithering: 'atkinson',
+                    contrast: 0,
+                    brightness: 0,
+                    threshold: 128
+                  };
+                  elements.push(newEl);
+                  selectedElementIndex = elements.length - 1;
+                  saveDraftToStorage();
+                  updateCanvasSize();
+                  updatePropertyPanel();
+                  render();
+                  pushHistory();
+                };
+                img.src = event.target.result;
+              };
+              reader.readAsDataURL(file);
+            }
+          }
+        }
+      });
+
+      // Global click-out deselection listener
+      document.addEventListener('mousedown', (e) => {
+        if (e.target.closest('#canvasWrapper') || e.target.closest('#propertiesPanel') || e.target.closest('.sidebar') || e.target.closest('.toolbar') || e.target.closest('.modal')) {
+          return;
+        }
+        if (selectedElementIndex !== -1) {
+          selectedElementIndex = -1;
+          updatePropertyPanel();
+          render();
         }
       });
     }
@@ -1582,13 +1725,14 @@
       };
 
       if (type === 'text') {
-        el.text = 'Double-cliquez';
+        el.text = 'Double-cliquez pour éditer';
         el.fontSize = 24;
         el.fontFamily = 'Inter';
         el.bold = false;
         el.italic = false;
-        el.width = 160;
-        el.height = 36;
+        el.width = 250;
+        el.height = 35;
+        el.textAlign = 'center';
       } else if (type === 'qrcode') {
         el.content = 'https://google.com';
         el.width = 80;
@@ -1689,6 +1833,18 @@
       handlePointerDown(clientX, clientY);
     }
 
+    function getLocalCoords(px, py, cx, cy, angleDegrees) {
+      const angleRadians = (-angleDegrees * Math.PI) / 180;
+      const cos = Math.cos(angleRadians);
+      const sin = Math.sin(angleRadians);
+      const dx = px - cx;
+      const dy = py - cy;
+      return {
+        x: cx + (dx * cos - dy * sin),
+        y: cy + (dx * sin + dy * cos)
+      };
+    }
+
     function handlePointerDown(x, y) {
       isDragging = false;
       isResizing = false;
@@ -1696,9 +1852,18 @@
       // Check if we clicked on the resize handle of the selected element
       if (selectedElementIndex !== -1) {
         const el = elements[selectedElementIndex];
+        let localX = x;
+        let localY = y;
+        if (el.rotation) {
+          const cx = el.x + el.width / 2;
+          const cy = el.y + el.height / 2;
+          const local = getLocalCoords(x, y, cx, cy, el.rotation);
+          localX = local.x;
+          localY = local.y;
+        }
         const handleX = el.x + el.width;
         const handleY = el.y + el.height;
-        const dist = Math.hypot(x - handleX, y - handleY);
+        const dist = Math.hypot(localX - handleX, localY - handleY);
         
         if (dist <= resizeHandleSize) {
           isResizing = true;
@@ -1714,7 +1879,16 @@
       // Check if we clicked inside any element (ordered top to bottom)
       for (let i = elements.length - 1; i >= 0; i--) {
         const el = elements[i];
-        if (x >= el.x && x <= el.x + el.width && y >= el.y && y <= el.y + el.height) {
+        let localX = x;
+        let localY = y;
+        if (el.rotation) {
+          const cx = el.x + el.width / 2;
+          const cy = el.y + el.height / 2;
+          const local = getLocalCoords(x, y, cx, cy, el.rotation);
+          localX = local.x;
+          localY = local.y;
+        }
+        if (localX >= el.x && localX <= el.x + el.width && localY >= el.y && localY <= el.y + el.height) {
           selectedElementIndex = i;
           isDragging = true;
           dragStartX = x;
@@ -1764,8 +1938,22 @@
         }
         render();
       } else if (isResizing) {
-        const dx = x - dragStartX;
-        const dy = y - dragStartY;
+        let localX = x;
+        let localY = y;
+        let localStartX = dragStartX;
+        let localStartY = dragStartY;
+        if (el.rotation) {
+          const cx = el.x + el.width / 2;
+          const cy = el.y + el.height / 2;
+          const local = getLocalCoords(x, y, cx, cy, el.rotation);
+          localX = local.x;
+          localY = local.y;
+          const localStart = getLocalCoords(dragStartX, dragStartY, cx, cy, el.rotation);
+          localStartX = localStart.x;
+          localStartY = localStart.y;
+        }
+        const dx = localX - localStartX;
+        const dy = localY - localStartY;
         
         let newWidth = initialResizeWidth + dx;
         let newHeight = initialResizeHeight + dy;
@@ -1823,11 +2011,17 @@
       propSectionCode.classList.add('hidden');
       propSectionShape.classList.add('hidden');
 
+      // Universal properties
+      inputPropRotation.value = el.rotation || 0;
+      lblPropRotationVal.textContent = (el.rotation || 0) + '°';
+
       if (el.type === 'text') {
         propSectionText.classList.remove('hidden');
         inputTextContent.value = el.text;
         selectTextFont.value = el.fontFamily || 'Inter';
         inputTextSize.value = el.fontSize || 24;
+        inputTextWidth.value = el.width || 250;
+        selectTextAlign.value = el.textAlign || 'center';
         btnTextBold.style.backgroundColor = el.bold ? 'var(--accent-dim)' : 'var(--surface-card)';
         btnTextItalic.style.backgroundColor = el.italic ? 'var(--accent-dim)' : 'var(--surface-card)';
       } else if (el.type === 'image') {
@@ -1937,12 +2131,19 @@
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // Draw active elements
       elements.forEach((el, index) => {
         ctx.save();
         
+        // Universal Rotation
+        if (el.rotation) {
+          const cx = el.x + el.width / 2;
+          const cy = el.y + el.height / 2;
+          ctx.translate(cx, cy);
+          ctx.rotate((el.rotation * Math.PI) / 180);
+          ctx.translate(-cx, -cy);
+        }
+        
         if (el.type === 'text') {
-          // Draw text
           ctx.fillStyle = '#000000';
           let fontStyle = '';
           if (el.italic) fontStyle += 'italic ';
@@ -1950,15 +2151,56 @@
           ctx.font = `${fontStyle}${el.fontSize}px "${el.fontFamily}"`;
           ctx.textBaseline = 'top';
           
-          // Word wrapping if needed, but for simplicity, we support single & double lines.
+          if (!el.width) el.width = 250;
+
           const text = el.text || '';
-          ctx.fillText(text, el.x, el.y);
+          const paragraphs = text.split('\n');
+          let lines = [];
           
-          // Auto width/height adjustment for selection box based on text metrics
-          const metrics = ctx.measureText(text);
-          el.width = Math.max(20, Math.round(metrics.width));
-          // Height is roughly proportional to font size
-          el.height = Math.round(el.fontSize * 1.15);
+          paragraphs.forEach(para => {
+            const words = para.split(' ');
+            let line = '';
+            for (let n = 0; n < words.length; n++) {
+              let testLine = line + words[n] + ' ';
+              let metrics = ctx.measureText(testLine);
+              if (metrics.width > el.width && n > 0) {
+                lines.push(line.trim());
+                line = words[n] + ' ';
+              } else {
+                line = testLine;
+              }
+            }
+            lines.push(line.trim());
+          });
+
+          const lineHeight = el.fontSize * 1.2;
+          el.height = Math.max(15, Math.round(lines.length * lineHeight));
+
+          lines.forEach((line, idx) => {
+            let lineY = el.y + idx * lineHeight;
+            let lineX = el.x;
+
+            const metrics = ctx.measureText(line);
+            if (el.textAlign === 'center') {
+              lineX = el.x + (el.width - metrics.width) / 2;
+            } else if (el.textAlign === 'right') {
+              lineX = el.x + el.width - metrics.width;
+            } else if (el.textAlign === 'justify' && idx < lines.length - 1) {
+              const wordsInLine = line.split(' ');
+              if (wordsInLine.length > 1) {
+                const totalWordsWidth = wordsInLine.reduce((sum, word) => sum + ctx.measureText(word).width, 0);
+                const extraSpace = el.width - totalWordsWidth;
+                const spaceWidth = extraSpace / (wordsInLine.length - 1);
+                let currentX = el.x;
+                wordsInLine.forEach((word) => {
+                  ctx.fillText(word, currentX, lineY);
+                  currentX += ctx.measureText(word).width + spaceWidth;
+                });
+                return; // handled
+              }
+            }
+            ctx.fillText(line, lineX, lineY);
+          });
           
         } else if (el.type === 'image' && el.imageObj) {
           // Apply filters dynamically on local temporary canvas if needed, or draw simple preview
