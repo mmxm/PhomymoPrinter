@@ -917,7 +917,7 @@
 
   <script>
     // Constants & Configuration
-    const APP_VERSION = 'v1.0.30';
+    const APP_VERSION = 'v1.0.31';
     const DPI = 300;
     const MM_TO_INCH = 25.4;
     const PIXEL_RATIO = DPI / MM_TO_INCH; // dots per mm (approx 11.81 dots/mm)
@@ -3434,10 +3434,9 @@
         await sleep(100);
 
         const feedLines = Math.round(feedMM * PIXEL_RATIO);
-        const ejectLines = Math.round(25 * PIXEL_RATIO); // 25mm to eject past the tear-off bar
         
-        // Total height: 2px (line 1) + feedLines (space) + 2px (line 2) + ejectLines (eject)
-        const totalHeight = 2 + feedLines + 2 + ejectLines;
+        // Total height: 2px (line 1) + feedLines (space) + 2px (line 2)
+        const totalHeight = 2 + feedLines + 2;
         const bytesPerLine = 78; // 624 px wide
         
         const rawBytes = new Uint8Array(bytesPerLine * totalHeight);
@@ -3447,13 +3446,11 @@
           rawBytes[i] = 0xFF;
         }
         
-        // Line 2: Black on 2 pixel rows right after the feed gap (index 2 + feedLines and 3 + feedLines)
-        const line2StartIndex = bytesPerLine * (2 + feedLines);
+        // Line 2: Black on last 2 pixel rows (index totalHeight - 2 and totalHeight - 1)
+        const line2StartIndex = bytesPerLine * (totalHeight - 2);
         for (let i = 0; i < bytesPerLine * 2; i++) {
           rawBytes[line2StartIndex + i] = 0xFF;
         }
-
-        // Rest of the array (gap and final ejection) is automatically 0x00 (white).
 
         // 2. Initialize printer
         await writeBLE(printerCharacteristic, new Uint8Array([0x1B, 0x40]));
