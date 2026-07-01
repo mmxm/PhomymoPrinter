@@ -613,6 +613,11 @@
             <span style="font-size: 0.85rem; color: var(--text-secondary);">mm</span>
           </div>
         </div>
+
+        <div class="form-group" style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.75rem;">
+          <input type="checkbox" id="chkCutLines" style="margin: 0; width: 1.1rem; height: 1.1rem; cursor: pointer;">
+          <label for="chkCutLines" style="margin: 0; cursor: pointer; font-size: 0.8rem; font-weight: 500;">Traits de découpe pointillés</label>
+        </div>
       </div>
 
       <!-- Config Import/Export -->
@@ -673,7 +678,7 @@
           <svg viewBox="0 0 24 24"><polygon points="12,3 21,21 3,21" fill="none" stroke="currentColor" stroke-width="2"/></svg>
         </button>
         <button id="btnAddLine" class="toolbar-btn" title="Ajouter une Ligne">
-          <svg viewBox="0 0 24 24"><path d="M13 4A1 1 0 0 0 12 3A1 1 0 0 0 11 4A1 1 0 0 0 11 11.06L5.38 16.69A1.5 1.5 0 0 0 6.44 19.25A1.5 1.5 0 0 0 7.5 18.81L13.12 13.19A1 1 0 0 0 13 13A1 1 0 0 0 13 4Z"/></svg>
+          <svg viewBox="0 0 24 24"><line x1="4" y1="20" x2="20" y2="4" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" /></svg>
         </button>
       </div>
 
@@ -876,6 +881,16 @@
               <label for="inputStrokeWidth">Épaisseur du trait</label>
               <input type="number" id="inputStrokeWidth" min="1" max="20" value="2">
             </div>
+            <div class="form-group">
+              <label for="selectLineDash">Style du trait</label>
+              <select id="selectLineDash">
+                <option value="solid" selected>Plein</option>
+                <option value="dashed-short">Pointillés courts</option>
+                <option value="dashed-medium">Pointillés moyens</option>
+                <option value="dashed-long">Pointillés longs</option>
+                <option value="dotted">Points</option>
+              </select>
+            </div>
             <div class="form-group" id="roundRectRadiusGroup">
               <label for="inputRoundRectRadius">Rayon des coins (px)</label>
               <input type="number" id="inputRoundRectRadius" min="0" max="100" value="10">
@@ -883,9 +898,14 @@
             <div class="form-group" id="fillShapeGroup">
               <label for="selectFillShape">Remplissage</label>
               <select id="selectFillShape">
-                <option value="black">Noir</option>
                 <option value="transparent" selected>Transparent</option>
                 <option value="white">Blanc</option>
+                <option value="gray-20">Gris très clair (20%)</option>
+                <option value="gray-40">Gris clair (40%)</option>
+                <option value="gray-50">Gris moyen (50%)</option>
+                <option value="gray-60">Gris sombre (60%)</option>
+                <option value="gray-80">Gris très sombre (80%)</option>
+                <option value="black">Noir (100%)</option>
               </select>
             </div>
           </div>
@@ -936,7 +956,7 @@
 
   <script>
     // Constants & Configuration
-    const APP_VERSION = 'v1.0.33';
+    const APP_VERSION = 'v1.0.34';
     const DPI = 300;
     const MM_TO_INCH = 25.4;
     const PIXEL_RATIO = DPI / MM_TO_INCH; // dots per mm (approx 11.81 dots/mm)
@@ -984,7 +1004,8 @@
       marginRightMM: 3,
       feedLengthMM: 12,
       heightMode: 'auto', // 'auto' or 'fixed'
-      labelHeightMM: 50
+      labelHeightMM: 50,
+      cutLines: false
     };
 
     // DOM Elements
@@ -1074,6 +1095,8 @@
     const selectFillShape = document.getElementById('selectFillShape');
     const inputRoundRectRadius = document.getElementById('inputRoundRectRadius');
     const roundRectRadiusGroup = document.getElementById('roundRectRadiusGroup');
+    const selectLineDash = document.getElementById('selectLineDash');
+    const chkCutLines = document.getElementById('chkCutLines');
 
     // Sidebar Layer Control Buttons in prop panel
     const btnPropMoveUp = document.getElementById('btnPropMoveUp');
@@ -1151,6 +1174,7 @@
           inputFeedLength.value = settings.feedLengthMM;
           selectHeightMode.value = settings.heightMode;
           inputLabelHeight.value = settings.labelHeightMM;
+          if (chkCutLines) chkCutLines.checked = settings.cutLines || false;
           
           if (settings.heightMode === 'fixed') {
             fixedHeightGroup.classList.remove('hidden');
@@ -1467,6 +1491,12 @@
         render();
       });
 
+      chkCutLines.addEventListener('change', (e) => {
+        settings.cutLines = e.target.checked;
+        saveSettingsToStorage();
+        render();
+      });
+
       // Connect Bluetooth Device
       btnConnect.addEventListener('click', connectPrinter);
 
@@ -1589,6 +1619,9 @@
 
       inputStrokeWidth.addEventListener('input', (e) => {
         updateSelectedElement('strokeWidth', parseInt(e.target.value) || 2);
+      });
+      selectLineDash.addEventListener('change', (e) => {
+        updateSelectedElement('lineDash', e.target.value);
       });
       inputRoundRectRadius.addEventListener('input', (e) => {
         updateSelectedElement('borderRadius', parseInt(e.target.value) || 0);
@@ -2004,26 +2037,31 @@
         el.height = 60;
         el.strokeWidth = 2;
         el.fill = 'transparent';
+        el.lineDash = 'solid';
       } else if (type === 'roundrect') {
         el.width = 100;
         el.height = 60;
         el.strokeWidth = 2;
         el.fill = 'transparent';
         el.borderRadius = 10;
+        el.lineDash = 'solid';
       } else if (type === 'circle') {
         el.width = 80;
         el.height = 80;
         el.strokeWidth = 2;
         el.fill = 'transparent';
+        el.lineDash = 'solid';
       } else if (type === 'triangle') {
         el.width = 80;
         el.height = 80;
         el.strokeWidth = 2;
         el.fill = 'transparent';
+        el.lineDash = 'solid';
       } else if (type === 'line') {
         el.width = 120;
         el.height = 10;
         el.strokeWidth = 3;
+        el.lineDash = 'solid';
       }
 
       // Center exactly in the printable white label
@@ -2539,6 +2577,7 @@
       } else if (el.type === 'rectangle' || el.type === 'roundrect' || el.type === 'circle' || el.type === 'triangle' || el.type === 'line') {
         propSectionShape.classList.remove('hidden');
         inputStrokeWidth.value = el.strokeWidth || 2;
+        selectLineDash.value = el.lineDash || 'solid';
         if (el.type === 'roundrect') {
           roundRectRadiusGroup.classList.remove('hidden');
           inputRoundRectRadius.value = el.borderRadius || 10;
@@ -2769,6 +2808,29 @@
       ctx.fill();
       ctx.restore();
 
+      // Draw horizontal cut lines preview on canvas if checked
+      if (settings.cutLines) {
+        const { leftMarginPx, rightMarginPx } = getAlignedMargins();
+        ctx.save();
+        ctx.strokeStyle = '#dc2626'; // Red visual indicator
+        ctx.lineWidth = 1;
+        ctx.setLineDash([2, 4]);
+        
+        // Top cut line
+        ctx.beginPath();
+        ctx.moveTo(WORKSPACE_PADDING_X + leftMarginPx, WORKSPACE_PADDING_Y + 0.5);
+        ctx.lineTo(WORKSPACE_PADDING_X + 624 - rightMarginPx, WORKSPACE_PADDING_Y + 0.5);
+        ctx.stroke();
+        
+        // Bottom cut line
+        ctx.beginPath();
+        ctx.moveTo(WORKSPACE_PADDING_X + leftMarginPx, WORKSPACE_PADDING_Y + labelH - 0.5);
+        ctx.lineTo(WORKSPACE_PADDING_X + 624 - rightMarginPx, WORKSPACE_PADDING_Y + labelH - 0.5);
+        ctx.stroke();
+        
+        ctx.restore();
+      }
+
       // 3. Draw physical graduated scale rulers
       drawRulers(labelW, labelH);
 
@@ -2902,53 +2964,63 @@
         } else if (el.type === 'rectangle') {
           ctx.strokeStyle = '#000000';
           ctx.lineWidth = el.strokeWidth || 2;
-          if (el.fill !== 'transparent') {
-            ctx.fillStyle = el.fill === 'white' ? '#ffffff' : '#000000';
+          applyLineDash(ctx, el.lineDash);
+          if (el.fill && el.fill !== 'transparent') {
+            ctx.fillStyle = getFillColor(el.fill);
             ctx.fillRect(el.x, el.y, el.width, el.height);
           }
           ctx.strokeRect(el.x, el.y, el.width, el.height);
+          ctx.setLineDash([]);
         } else if (el.type === 'roundrect') {
           ctx.strokeStyle = '#000000';
           ctx.lineWidth = el.strokeWidth || 2;
+          applyLineDash(ctx, el.lineDash);
           ctx.beginPath();
           const r = el.borderRadius !== undefined ? el.borderRadius : 10;
           ctx.roundRect(el.x, el.y, el.width, el.height, r);
-          if (el.fill !== 'transparent') {
-            ctx.fillStyle = el.fill === 'white' ? '#ffffff' : '#000000';
+          if (el.fill && el.fill !== 'transparent') {
+            ctx.fillStyle = getFillColor(el.fill);
             ctx.fill();
           }
           ctx.stroke();
+          ctx.setLineDash([]);
         } else if (el.type === 'circle') {
           ctx.strokeStyle = '#000000';
           ctx.lineWidth = el.strokeWidth || 2;
+          applyLineDash(ctx, el.lineDash);
           const r = el.width / 2;
           ctx.beginPath();
           ctx.arc(el.x + r, el.y + r, r - ctx.lineWidth/2, 0, Math.PI * 2);
-          if (el.fill !== 'transparent') {
-            ctx.fillStyle = el.fill === 'white' ? '#ffffff' : '#000000';
+          if (el.fill && el.fill !== 'transparent') {
+            ctx.fillStyle = getFillColor(el.fill);
             ctx.fill();
           }
           ctx.stroke();
+          ctx.setLineDash([]);
         } else if (el.type === 'triangle') {
           ctx.strokeStyle = '#000000';
           ctx.lineWidth = el.strokeWidth || 2;
+          applyLineDash(ctx, el.lineDash);
           ctx.beginPath();
           ctx.moveTo(el.x + el.width / 2, el.y);
           ctx.lineTo(el.x + el.width, el.y + el.height);
           ctx.lineTo(el.x, el.y + el.height);
           ctx.closePath();
-          if (el.fill !== 'transparent') {
-            ctx.fillStyle = el.fill === 'white' ? '#ffffff' : '#000000';
+          if (el.fill && el.fill !== 'transparent') {
+            ctx.fillStyle = getFillColor(el.fill);
             ctx.fill();
           }
           ctx.stroke();
+          ctx.setLineDash([]);
         } else if (el.type === 'line') {
           ctx.strokeStyle = '#000000';
           ctx.lineWidth = el.strokeWidth || 3;
+          applyLineDash(ctx, el.lineDash);
           ctx.beginPath();
           ctx.moveTo(el.x, el.y + el.height/2);
           ctx.lineTo(el.x + el.width, el.y + el.height/2);
           ctx.stroke();
+          ctx.setLineDash([]);
         }
 
         ctx.restore();
@@ -3125,6 +3197,27 @@
         WORKSPACE_PADDING_X + leftMarginPx, WORKSPACE_PADDING_Y, printableWidth, labelHeight, 
         0, 0, printableWidth, labelHeight
       );
+
+      // Draw horizontal cut lines if settings.cutLines is checked
+      if (settings.cutLines) {
+        pCtx.strokeStyle = '#000000';
+        pCtx.lineWidth = 1;
+        pCtx.setLineDash([2, 4]); // 2px dash, 4px gap (very fine/short dotted style)
+        
+        // Top line
+        pCtx.beginPath();
+        pCtx.moveTo(0, 0.5);
+        pCtx.lineTo(printCanvas.width, 0.5);
+        pCtx.stroke();
+        
+        // Bottom line
+        pCtx.beginPath();
+        pCtx.moveTo(0, printCanvas.height - 0.5);
+        pCtx.lineTo(printCanvas.width, printCanvas.height - 0.5);
+        pCtx.stroke();
+        
+        pCtx.setLineDash([]); // Reset
+      }
 
       // 2. Read image data
       const imgData = pCtx.getImageData(0, 0, printCanvas.width, printCanvas.height);
@@ -3769,6 +3862,7 @@
           inputFeedLength.value = settings.feedLengthMM;
           selectHeightMode.value = settings.heightMode;
           inputLabelHeight.value = settings.labelHeightMM;
+          if (chkCutLines) chkCutLines.checked = settings.cutLines || false;
 
           if (settings.heightMode === 'fixed') {
             fixedHeightGroup.classList.remove('hidden');
@@ -3887,6 +3981,7 @@
       inputFeedLength.value = settings.feedLengthMM;
       selectHeightMode.value = settings.heightMode;
       inputLabelHeight.value = settings.labelHeightMM;
+      if (chkCutLines) chkCutLines.checked = settings.cutLines || false;
 
       if (settings.heightMode === 'fixed') {
         fixedHeightGroup.classList.remove('hidden');
@@ -4102,6 +4197,33 @@
 
     function handleCropPointerUp() {
       cropActiveHandle = null;
+    }
+
+    // Helper functions for shape rendering and styling
+    function getFillColor(val) {
+      if (val === 'transparent') return 'transparent';
+      if (val === 'white') return '#ffffff';
+      if (val === 'black') return '#000000';
+      if (val === 'gray-20') return '#e0e0e0';
+      if (val === 'gray-40') return '#b0b0b0';
+      if (val === 'gray-50') return '#808080';
+      if (val === 'gray-60') return '#606060';
+      if (val === 'gray-80') return '#303030';
+      return val || 'transparent';
+    }
+
+    function applyLineDash(ctx, style) {
+      if (style === 'dashed-short') {
+        ctx.setLineDash([4, 4]);
+      } else if (style === 'dashed-medium') {
+        ctx.setLineDash([8, 6]);
+      } else if (style === 'dashed-long') {
+        ctx.setLineDash([15, 10]);
+      } else if (style === 'dotted') {
+        ctx.setLineDash([2, 4]);
+      } else {
+        ctx.setLineDash([]);
+      }
     }
   </script>
 </body>
