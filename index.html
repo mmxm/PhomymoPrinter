@@ -914,7 +914,7 @@
 
   <script>
     // Constants & Configuration
-    const APP_VERSION = 'v1.0.16';
+    const APP_VERSION = 'v1.0.17';
     const DPI = 300;
     const MM_TO_INCH = 25.4;
     const PIXEL_RATIO = DPI / MM_TO_INCH; // dots per mm (approx 11.81 dots/mm)
@@ -2659,7 +2659,6 @@
 
       // Draw grid overlay for non-printable margins (translucent diagonal lines)
       const { leftMarginPx, rightMarginPx } = getAlignedMargins();
-      const labelH = canvas.height - WORKSPACE_PADDING_Y * 2;
 
       ctx.save();
       // Clip margins to the printable white label card boundaries
