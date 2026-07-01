@@ -956,7 +956,7 @@
 
   <script>
     // Constants & Configuration
-    const APP_VERSION = 'v1.0.34';
+    const APP_VERSION = 'v1.0.35';
     const DPI = 300;
     const MM_TO_INCH = 25.4;
     const PIXEL_RATIO = DPI / MM_TO_INCH; // dots per mm (approx 11.81 dots/mm)
@@ -1340,6 +1340,7 @@
               const img = new Image();
               img.onload = function() {
                 copy.imageObj = img;
+                updateImagePreview(copy);
                 imagesLoadedCount++;
                 if (imagesLoadedCount === imagesToLoadCount) {
                   finalizeLoad();
@@ -1939,6 +1940,7 @@
         el.height = Math.round(el.width / newRatio);
 
         cropModal.style.display = 'none';
+        updateImagePreview(el);
         pushHistory();
         updateCanvasSize();
         updatePropertyPanel();
@@ -2112,6 +2114,7 @@
             threshold: 128
           };
 
+          updateImagePreview(el);
           elements.push(el);
           selectedElementIndex = elements.length - 1;
           pushHistory();
@@ -2597,7 +2600,13 @@
 
     function updateSelectedElement(property, value) {
       if (selectedElementIndex === -1) return;
-      elements[selectedElementIndex][property] = value;
+      const el = elements[selectedElementIndex];
+      el[property] = value;
+      
+      // Update image preview cache when filters change
+      if (el.type === 'image' && ['contrast', 'brightness', 'dithering', 'threshold'].includes(property)) {
+        updateImagePreview(el);
+      }
       
       if (activeInlineTextarea && activeInlineElementIndex === selectedElementIndex) {
         if (property === 'text') {
@@ -2613,7 +2622,6 @@
       render();
       
       // Sync other input controls smoothly without full panel refresh
-      const el = elements[selectedElementIndex];
       if (inputPropX) inputPropX.value = el.x;
       if (inputPropY) inputPropY.value = el.y;
       if (inputPropW) inputPropW.value = el.width;
@@ -2909,7 +2917,9 @@
           });
           
         } else if (el.type === 'image' && el.imageObj) {
-          if (el.cropX !== undefined && el.cropY !== undefined && el.cropWidth !== undefined && el.cropHeight !== undefined) {
+          if (el.previewCanvas) {
+            ctx.drawImage(el.previewCanvas, el.x, el.y, el.width, el.height);
+          } else if (el.cropX !== undefined && el.cropY !== undefined && el.cropWidth !== undefined && el.cropHeight !== undefined) {
             ctx.drawImage(el.imageObj, el.cropX, el.cropY, el.cropWidth, el.cropHeight, el.x, el.y, el.width, el.height);
           } else {
             ctx.drawImage(el.imageObj, el.x, el.y, el.width, el.height);
@@ -4014,6 +4024,7 @@
           const img = new Image();
           img.onload = function() {
             copy.imageObj = img;
+            updateImagePreview(copy);
             imagesLoadedCount++;
             if (imagesLoadedCount === imagesToLoadCount) {
               finalizeLoad();
@@ -4223,6 +4234,126 @@
         ctx.setLineDash([2, 4]);
       } else {
         ctx.setLineDash([]);
+      }
+    }
+
+    function updateImagePreview(el) {
+      if (el.type !== 'image' || !el.imageObj) return;
+
+      let sourceW = el.cropWidth !== undefined ? el.cropWidth : el.imageObj.width;
+      let sourceH = el.cropHeight !== undefined ? el.cropHeight : el.imageObj.height;
+
+      // Downscale preview source if it is too large for fast real-time filters preview
+      const maxPreviewSize = 1024;
+      if (sourceW > maxPreviewSize || sourceH > maxPreviewSize) {
+        const ratio = Math.min(maxPreviewSize / sourceW, maxPreviewSize / sourceH);
+        sourceW = Math.round(sourceW * ratio);
+        sourceH = Math.round(sourceH * ratio);
+      }
+
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = sourceW;
+      tempCanvas.height = sourceH;
+      const tCtx = tempCanvas.getContext('2d');
+
+      if (el.cropX !== undefined && el.cropY !== undefined && el.cropWidth !== undefined && el.cropHeight !== undefined) {
+        tCtx.drawImage(el.imageObj, el.cropX, el.cropY, el.cropWidth, el.cropHeight, 0, 0, sourceW, sourceH);
+      } else {
+        tCtx.drawImage(el.imageObj, 0, 0, sourceW, sourceH);
+      }
+
+      try {
+        const imgData = tCtx.getImageData(0, 0, sourceW, sourceH);
+        const data = imgData.data;
+        
+        const contrastFactor = (259 * ((el.contrast || 0) + 255)) / (255 * (259 - (el.contrast || 0)));
+        const brightnessOffset = (el.brightness || 0) * 2.55;
+
+        const grayscale = new Float32Array(sourceW * sourceH);
+        for (let i = 0; i < data.length; i += 4) {
+          let r = data[i];
+          let g = data[i+1];
+          let b = data[i+2];
+
+          r = contrastFactor * (r - 128) + 128;
+          g = contrastFactor * (g - 128) + 128;
+          b = contrastFactor * (b - 128) + 128;
+
+          r += brightnessOffset;
+          g += brightnessOffset;
+          b += brightnessOffset;
+
+          r = Math.max(0, Math.min(255, r));
+          g = Math.max(0, Math.min(255, g));
+          b = Math.max(0, Math.min(255, b));
+
+          grayscale[i / 4] = 0.299 * r + 0.587 * g + 0.114 * b;
+        }
+
+        const dithered = new Uint8Array(sourceW * sourceH);
+        const ditheringMode = el.dithering || 'atkinson';
+        const thresholdVal = el.threshold !== undefined ? el.threshold : 128;
+
+        if (ditheringMode === 'threshold') {
+          for (let i = 0; i < grayscale.length; i++) {
+            dithered[i] = grayscale[i] < thresholdVal ? 0 : 255;
+          }
+        } else if (ditheringMode === 'floyd') {
+          const tempGray = new Float32Array(grayscale);
+          for (let y = 0; y < sourceH; y++) {
+            for (let x = 0; x < sourceW; x++) {
+              const idx = y * sourceW + x;
+              const oldVal = tempGray[idx];
+              const newVal = oldVal < 128 ? 0 : 255;
+              dithered[idx] = newVal;
+              const err = oldVal - newVal;
+
+              if (x + 1 < sourceW) tempGray[idx + 1] += err * 7/16;
+              if (y + 1 < sourceH) {
+                if (x - 1 >= 0) tempGray[idx + sourceW - 1] += err * 3/16;
+                tempGray[idx + sourceW] += err * 5/16;
+                if (x + 1 < sourceW) tempGray[idx + sourceW + 1] += err * 1/16;
+              }
+            }
+          }
+        } else {
+          const tempGray = new Float32Array(grayscale);
+          for (let y = 0; y < sourceH; y++) {
+            for (let x = 0; x < sourceW; x++) {
+              const idx = y * sourceW + x;
+              const oldVal = tempGray[idx];
+              const newVal = oldVal < 128 ? 0 : 255;
+              dithered[idx] = newVal;
+              const err = oldVal - newVal;
+
+              const e = err / 8;
+              if (x + 1 < sourceW) tempGray[idx + 1] += e;
+              if (x + 2 < sourceW) tempGray[idx + 2] += e;
+              if (y + 1 < sourceH) {
+                if (x - 1 >= 0) tempGray[idx + sourceW - 1] += e;
+                tempGray[idx + sourceW] += e;
+                if (x + 1 < sourceW) tempGray[idx + sourceW + 1] += e;
+              }
+              if (y + 2 < sourceH) {
+                tempGray[idx + sourceW * 2] += e;
+              }
+            }
+          }
+        }
+
+        for (let i = 0; i < dithered.length; i++) {
+          const val = dithered[i];
+          const pixelIdx = i * 4;
+          data[pixelIdx] = val;
+          data[pixelIdx + 1] = val;
+          data[pixelIdx + 2] = val;
+          data[pixelIdx + 3] = 255;
+        }
+
+        tCtx.putImageData(imgData, 0, 0);
+        el.previewCanvas = tempCanvas;
+      } catch (err) {
+        console.error("Erreur de génération de l'aperçu tramé:", err);
       }
     }
   </script>
