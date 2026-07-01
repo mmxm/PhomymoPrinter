@@ -914,7 +914,7 @@
 
   <script>
     // Constants & Configuration
-    const APP_VERSION = 'v1.0.20';
+    const APP_VERSION = 'v1.0.21';
     const DPI = 300;
     const MM_TO_INCH = 25.4;
     const PIXEL_RATIO = DPI / MM_TO_INCH; // dots per mm (approx 11.81 dots/mm)
@@ -3055,11 +3055,7 @@
       try {
         const feedLines = Math.round(5 * PIXEL_RATIO); // 5mm manual feed per click
         
-        // 1. Wake up and initialize printer first
-        await printerCharacteristic.writeValue(new Uint8Array([0x1B, 0x40]));
-        await sleep(50);
-        
-        // 2. Send feed command synch with response
+        // Envoi direct de la commande de défilement synchrone avec réponse
         await printerCharacteristic.writeValue(new Uint8Array([0x1B, 0x4A, feedLines]));
         console.log("Avancement manuel de 5mm envoyé et exécuté");
       } catch (e) {
