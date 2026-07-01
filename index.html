@@ -917,7 +917,7 @@
 
   <script>
     // Constants & Configuration
-    const APP_VERSION = 'v1.0.29';
+    const APP_VERSION = 'v1.0.30';
     const DPI = 300;
     const MM_TO_INCH = 25.4;
     const PIXEL_RATIO = DPI / MM_TO_INCH; // dots per mm (approx 11.81 dots/mm)
@@ -3415,7 +3415,7 @@
       }
     }
 
-    // Calibrate Feed: Prints 2 thin lines separated by an ESC d feed of 10 lines, then feeds them out
+    // Calibrate Feed: Prints 2 thin lines separated by the configured feed length in mm, then feeds them out
     async function printFeedCalibration() {
       if (!printerCharacteristic) {
         alert("Veuillez d'abord vous connecter à l'imprimante !");
@@ -3426,56 +3426,86 @@
         isPrintingCancelled = false;
         printOverlay.style.display = 'flex';
         printProgressTitle.textContent = "Test de calibration...";
-        printProgressSub.textContent = "Génération des lignes de test...";
+        
+        // 1. Determine the feed length to test (from settings, default to 20mm)
+        const feedMM = parseFloat(settings.feedLengthMM) || 20;
+        printProgressSub.textContent = `Génération du test de saut de ${feedMM}mm...`;
         printProgressBar.style.width = '10%';
         await sleep(100);
 
-        // 1. Wake up and initialize printer
+        const feedLines = Math.round(feedMM * PIXEL_RATIO);
+        const ejectLines = Math.round(25 * PIXEL_RATIO); // 25mm to eject past the tear-off bar
+        
+        // Total height: 2px (line 1) + feedLines (space) + 2px (line 2) + ejectLines (eject)
+        const totalHeight = 2 + feedLines + 2 + ejectLines;
+        const bytesPerLine = 78; // 624 px wide
+        
+        const rawBytes = new Uint8Array(bytesPerLine * totalHeight);
+        
+        // Line 1: Black on first 2 pixel rows (index 0 and 1)
+        for (let i = 0; i < bytesPerLine * 2; i++) {
+          rawBytes[i] = 0xFF;
+        }
+        
+        // Line 2: Black on 2 pixel rows right after the feed gap (index 2 + feedLines and 3 + feedLines)
+        const line2StartIndex = bytesPerLine * (2 + feedLines);
+        for (let i = 0; i < bytesPerLine * 2; i++) {
+          rawBytes[line2StartIndex + i] = 0xFF;
+        }
+
+        // Rest of the array (gap and final ejection) is automatically 0x00 (white).
+
+        // 2. Initialize printer
         await writeBLE(printerCharacteristic, new Uint8Array([0x1B, 0x40]));
         await writeBLE(printerCharacteristic, new Uint8Array([0x1B, 0x61, 0x01])); // center alignment
         await writeBLE(printerCharacteristic, new Uint8Array([0x1F, 0x11, 0x02, 0x04])); // normal density
         await sleep(50);
 
-        // 2. Prepare 2-pixel tall line data
-        // Width is 624 px = 78 bytes. All bits set to 1 for black pixels!
-        const totalRows = 2;
-        const lineData = new Uint8Array(78 * totalRows).fill(0xFF);
-
-        // Send GS v 0 command to print first line
-        printProgressSub.textContent = "Impression de la 1ère ligne...";
-        const header = new Uint8Array([0x1D, 0x76, 0x30, 0x00, 78, 0, totalRows, 0]);
+        // 3. Send single raster image
+        const xL = bytesPerLine & 0xFF;
+        const xH = (bytesPerLine >> 8) & 0xFF;
+        const heightVal = totalHeight - 1;
+        const yL = heightVal & 0xFF;
+        const yH = (heightVal >> 8) & 0xFF;
+        
+        const header = new Uint8Array([0x1D, 0x76, 0x30, 0x00, xL, xH, yL, yH]);
         await writeBLE(printerCharacteristic, header);
         await sleep(20);
-        await writeBLE(printerCharacteristic, lineData);
-        await sleep(50);
 
-        // 3. Send ESC d [10] to feed exactly 10 lines
-        const testLines = 10;
-        printProgressSub.textContent = `Avancement de ${testLines} lignes...`;
-        await writeBLE(printerCharacteristic, new Uint8Array([0x1B, 0x64, testLines]));
-        // Sleep to let the motor turn
-        await sleep(testLines * 150);
+        // Send packed data in chunks
+        const chunkSize = 120;
+        let sentBytes = 0;
+        const totalBytes = rawBytes.length;
 
-        // 4. Send GS v 0 command to print second line
-        printProgressSub.textContent = "Impression de la 2ème ligne...";
-        await writeBLE(printerCharacteristic, header);
-        await sleep(20);
-        await writeBLE(printerCharacteristic, lineData);
-        await sleep(50);
+        printProgressTitle.textContent = "Impression du test...";
 
-        // 5. Feed another 6 lines so that both lines are fully out of the printer and can be cut/measured
+        while (sentBytes < totalBytes) {
+          if (isPrintingCancelled) {
+            console.log("Test de calibration annulé");
+            return;
+          }
+          const end = Math.min(sentBytes + chunkSize, totalBytes);
+          const chunk = rawBytes.slice(sentBytes, end);
+          await writeBLE(printerCharacteristic, chunk);
+          sentBytes = end;
+          
+          const progress = Math.round((sentBytes / totalBytes) * 100);
+          printProgressBar.style.width = progress + '%';
+          await sleep(12);
+        }
+
+        // Wait for the motor to finish printing the white padding before shutting down
         printProgressSub.textContent = "Sortie du papier...";
-        await writeBLE(printerCharacteristic, new Uint8Array([0x1B, 0x64, 6]));
-        await sleep(900);
+        await sleep(800);
 
-        // 6. Sleep commands
+        // 4. Shutdown commands
         await writeBLE(printerCharacteristic, new Uint8Array([0x1F, 0x11, 0x08]));
         await writeBLE(printerCharacteristic, new Uint8Array([0x1F, 0x11, 0x0E]));
         await sleep(50);
 
-        printProgressTitle.textContent = "Test terminé !";
-        printProgressSub.textContent = "Mesurez l'écart entre les deux lignes.";
-        await sleep(1500);
+        printProgressTitle.textContent = "Test de calibration imprimé !";
+        printProgressSub.textContent = `L'écart doit faire exactement ${feedMM} mm.`;
+        await sleep(2000);
       } catch (err) {
         console.error("Échec du test de calibration :", err);
         alert("Erreur lors du test de calibration : " + err.message);
