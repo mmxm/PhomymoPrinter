@@ -593,6 +593,9 @@
           <button id="btnFeedManual" style="width: 100%; margin-top: 0.5rem; justify-content: center; padding: 0.4rem;">
             Dérouler manuellement
           </button>
+          <button id="btnPrintFeedCalibration" class="secondary" style="width: 100%; margin-top: 0.4rem; justify-content: center; padding: 0.4rem; font-size: 0.75rem;">
+            Imprimer test calibration saut
+          </button>
         </div>
 
         <div class="form-group">
@@ -914,7 +917,7 @@
 
   <script>
     // Constants & Configuration
-    const APP_VERSION = 'v1.0.26';
+    const APP_VERSION = 'v1.0.27';
     const DPI = 300;
     const MM_TO_INCH = 25.4;
     const PIXEL_RATIO = DPI / MM_TO_INCH; // dots per mm (approx 11.81 dots/mm)
@@ -970,6 +973,7 @@
     const lblStartMM = document.getElementById('lblStartMM');
     const lblEndMM = document.getElementById('lblEndMM');
     const btnPrintTestPattern = document.getElementById('btnPrintTestPattern');
+    const btnPrintFeedCalibration = document.getElementById('btnPrintFeedCalibration');
     const inputFeedLength = document.getElementById('inputFeedLength');
     const selectHeightMode = document.getElementById('selectHeightMode');
     const fixedHeightGroup = document.getElementById('fixedHeightGroup');
@@ -1398,6 +1402,10 @@
 
       btnPrintTestPattern.addEventListener('click', () => {
         printTestPattern();
+      });
+
+      btnPrintFeedCalibration.addEventListener('click', () => {
+        printFeedCalibration();
       });
 
       inputFeedLength.addEventListener('change', (e) => {
@@ -3394,6 +3402,75 @@
       } finally {
         printOverlay.style.display = 'none';
         render();
+      }
+    }
+
+    // Calibrate Feed: Prints 2 thin lines separated by an ESC d feed of 10 lines, then feeds them out
+    async function printFeedCalibration() {
+      if (!printerCharacteristic) {
+        alert("Veuillez d'abord vous connecter à l'imprimante !");
+        return;
+      }
+      
+      try {
+        isPrintingCancelled = false;
+        printOverlay.style.display = 'flex';
+        printProgressTitle.textContent = "Test de calibration...";
+        printProgressSub.textContent = "Génération des lignes de test...";
+        printProgressBar.style.width = '10%';
+        await sleep(100);
+
+        // 1. Wake up and initialize printer
+        await writeBLE(printerCharacteristic, new Uint8Array([0x1B, 0x40]));
+        await writeBLE(printerCharacteristic, new Uint8Array([0x1B, 0x61, 0x01])); // center alignment
+        await writeBLE(printerCharacteristic, new Uint8Array([0x1F, 0x11, 0x02, 0x04])); // normal density
+        await sleep(50);
+
+        // 2. Prepare 2-pixel tall line data
+        // Width is 624 px = 78 bytes. All bits set to 1 for black pixels!
+        const totalRows = 2;
+        const lineData = new Uint8Array(78 * totalRows).fill(0xFF);
+
+        // Send GS v 0 command to print first line
+        printProgressSub.textContent = "Impression de la 1ère ligne...";
+        const header = new Uint8Array([0x1D, 0x76, 0x30, 0x00, 78, 0, totalRows, 0]);
+        await writeBLE(printerCharacteristic, header);
+        await sleep(20);
+        await writeBLE(printerCharacteristic, lineData);
+        await sleep(50);
+
+        // 3. Send ESC d [10] to feed exactly 10 lines
+        const testLines = 10;
+        printProgressSub.textContent = `Avancement de ${testLines} lignes...`;
+        await writeBLE(printerCharacteristic, new Uint8Array([0x1B, 0x64, testLines]));
+        // Sleep to let the motor turn
+        await sleep(testLines * 150);
+
+        // 4. Send GS v 0 command to print second line
+        printProgressSub.textContent = "Impression de la 2ème ligne...";
+        await writeBLE(printerCharacteristic, header);
+        await sleep(20);
+        await writeBLE(printerCharacteristic, lineData);
+        await sleep(50);
+
+        // 5. Feed another 6 lines so that both lines are fully out of the printer and can be cut/measured
+        printProgressSub.textContent = "Sortie du papier...";
+        await writeBLE(printerCharacteristic, new Uint8Array([0x1B, 0x64, 6]));
+        await sleep(900);
+
+        // 6. Sleep commands
+        await writeBLE(printerCharacteristic, new Uint8Array([0x1F, 0x11, 0x08]));
+        await writeBLE(printerCharacteristic, new Uint8Array([0x1F, 0x11, 0x0E]));
+        await sleep(50);
+
+        printProgressTitle.textContent = "Test terminé !";
+        printProgressSub.textContent = "Mesurez l'écart entre les deux lignes.";
+        await sleep(1500);
+      } catch (err) {
+        console.error("Échec du test de calibration :", err);
+        alert("Erreur lors du test de calibration : " + err.message);
+      } finally {
+        printOverlay.style.display = 'none';
       }
     }
 
