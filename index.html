@@ -914,7 +914,7 @@
 
   <script>
     // Constants & Configuration
-    const APP_VERSION = 'v1.0.25';
+    const APP_VERSION = 'v1.0.26';
     const DPI = 300;
     const MM_TO_INCH = 25.4;
     const PIXEL_RATIO = DPI / MM_TO_INCH; // dots per mm (approx 11.81 dots/mm)
@@ -2090,7 +2090,7 @@
         const handleY = el.y + el.height;
         const dist = Math.hypot(localX - handleX, localY - handleY);
         
-        if (dist <= resizeHandleSize) {
+        if (dist <= 24) {
           isResizing = true;
           activeResizeHandle = 'br';
           dragStartX = x;
@@ -2131,12 +2131,51 @@
     }
 
     function handleCanvasMouseMove(e) {
-      if (!isDragging && !isResizing) return;
-      
       const rect = canvas.getBoundingClientRect();
       const clientX = (e.clientX - rect.left) / zoomLevel;
       const clientY = (e.clientY - rect.top) / zoomLevel;
-      handlePointerMove(clientX, clientY);
+
+      if (isDragging || isResizing) {
+        handlePointerMove(clientX, clientY);
+        return;
+      }
+
+      // Update hover cursor style dynamically
+      let cursorStyle = 'default';
+      if (selectedElementIndex !== -1) {
+        const el = elements[selectedElementIndex];
+        let localX = clientX;
+        let localY = clientY;
+        if (el.rotation) {
+          const local = getLocalCoords(clientX, clientY, el.x, el.y, el.rotation);
+          localX = local.x;
+          localY = local.y;
+        }
+        const handleX = el.x + el.width;
+        const handleY = el.y + el.height;
+        const dist = Math.hypot(localX - handleX, localY - handleY);
+        if (dist <= 24) {
+          cursorStyle = 'nwse-resize';
+        }
+      }
+
+      if (cursorStyle === 'default') {
+        for (let i = elements.length - 1; i >= 0; i--) {
+          const el = elements[i];
+          let localX = clientX;
+          let localY = clientY;
+          if (el.rotation) {
+            const local = getLocalCoords(clientX, clientY, el.x, el.y, el.rotation);
+            localX = local.x;
+            localY = local.y;
+          }
+          if (localX >= el.x && localX <= el.x + el.width && localY >= el.y && localY <= el.y + el.height) {
+            cursorStyle = 'move';
+            break;
+          }
+        }
+      }
+      canvas.style.cursor = cursorStyle;
     }
 
     function handlePointerMove(x, y) {
@@ -2448,6 +2487,99 @@
       render();
     }
 
+    // Draw graduated rulers (scales) in centimeters/millimeters around the label
+    function drawRulers(labelW, labelH) {
+      ctx.save();
+      ctx.strokeStyle = '#64748b'; // Slate-500 gray-blue
+      ctx.fillStyle = '#64748b';
+      ctx.lineWidth = 1;
+      ctx.font = '9px Outfit, Inter, sans-serif';
+      ctx.textBaseline = 'middle';
+      
+      const startX = WORKSPACE_PADDING_X;
+      const startY = WORKSPACE_PADDING_Y;
+      
+      // 1. Horizontal Ruler (above label)
+      const rulerY = startY - 5; // 5px gap from label
+      ctx.beginPath();
+      ctx.moveTo(startX, rulerY);
+      ctx.lineTo(startX + labelW, rulerY);
+      ctx.stroke();
+      
+      const maxMM_X = Math.round(labelW / PIXEL_RATIO);
+      for (let mm = 0; mm <= maxMM_X; mm += 1) {
+        const x = startX + mm * PIXEL_RATIO;
+        if (mm % 10 === 0) {
+          // Major tick: 10mm (1cm)
+          ctx.beginPath();
+          ctx.moveTo(x, rulerY);
+          ctx.lineTo(x, rulerY - 10);
+          ctx.stroke();
+          
+          // Draw label in cm
+          ctx.textAlign = 'center';
+          ctx.fillText(`${mm / 10}`, x, rulerY - 16);
+        } else if (mm % 5 === 0) {
+          // Medium tick: 5mm
+          ctx.beginPath();
+          ctx.moveTo(x, rulerY);
+          ctx.lineTo(x, rulerY - 6);
+          ctx.stroke();
+        } else {
+          // Minor tick: 1mm
+          ctx.beginPath();
+          ctx.moveTo(x, rulerY);
+          ctx.lineTo(x, rulerY - 3);
+          ctx.stroke();
+        }
+      }
+      
+      // Unit label
+      ctx.textAlign = 'left';
+      ctx.fillText('cm', startX + labelW + 6, rulerY);
+      
+      // 2. Vertical Ruler (left of label)
+      const rulerX = startX - 5; // 5px gap from label
+      ctx.beginPath();
+      ctx.moveTo(rulerX, startY);
+      ctx.lineTo(rulerX, startY + labelH);
+      ctx.stroke();
+      
+      const maxMM_Y = Math.round(labelH / PIXEL_RATIO);
+      for (let mm = 0; mm <= maxMM_Y; mm += 1) {
+        const y = startY + mm * PIXEL_RATIO;
+        if (mm % 10 === 0) {
+          // Major tick: 10mm (1cm)
+          ctx.beginPath();
+          ctx.moveTo(rulerX, y);
+          ctx.lineTo(rulerX - 10, y);
+          ctx.stroke();
+          
+          // Draw label in cm
+          ctx.textAlign = 'right';
+          ctx.fillText(`${mm / 10}`, rulerX - 14, y);
+        } else if (mm % 5 === 0) {
+          // Medium tick: 5mm
+          ctx.beginPath();
+          ctx.moveTo(rulerX, y);
+          ctx.lineTo(rulerX - 6, y);
+          ctx.stroke();
+        } else {
+          // Minor tick: 1mm
+          ctx.beginPath();
+          ctx.moveTo(rulerX, y);
+          ctx.lineTo(rulerX - 3, y);
+          ctx.stroke();
+        }
+      }
+      
+      // Unit label
+      ctx.textAlign = 'center';
+      ctx.fillText('cm', rulerX, startY + labelH + 10);
+      
+      ctx.restore();
+    }
+
     // Render Canvas
     function render() {
       // 1. Draw checkerboard pattern on the entire canvas
@@ -2487,6 +2619,9 @@
       ctx.closePath();
       ctx.fill();
       ctx.restore();
+
+      // 3. Draw physical graduated scale rulers
+      drawRulers(labelW, labelH);
 
       elements.forEach((el, index) => {
         ctx.save();
@@ -3038,11 +3173,15 @@
         printProgressSub.textContent = "Finalisation de la découpe...";
         const feedMM = parseFloat(settings.feedLengthMM);
         if (feedMM > 0) {
-          // Convertir les mm en nombre de lignes (approx 3mm par ligne)
-          const feedLines = Math.max(1, Math.round(feedMM / 3));
+          // Régler l'interligne à 12 points (1mm)
+          console.log("[Print Feed] Réglage de l'interligne à 12 points (1mm)...");
+          await writeBLE(printerCharacteristic, new Uint8Array([0x1B, 0x33, 12]));
+          
+          // Envoyer le nombre de lignes correspondant exactement aux millimètres (1 ligne = 1mm)
+          const feedLines = Math.max(1, Math.round(feedMM));
           console.log(`[Print Feed] Envoi de ESC d ${feedLines} (pour ${feedMM}mm)`);
           await writeBLE(printerCharacteristic, new Uint8Array([0x1B, 0x64, feedLines]));
-          await sleep(feedLines * 150);
+          await sleep(feedLines * 50);
         }
 
         // 5. Send Shutdown / tasks complete commands
@@ -3076,9 +3215,13 @@
         await writeBLE(printerCharacteristic, new Uint8Array([0x1B, 0x40]));
         await sleep(50);
         
-        // 2. Send feed line command using writeBLE (ESC d 2 - feeds 2 lines)
-        console.log("[Manual Feed] Envoi de la commande de défilement par lignes (ESC d 2)...");
-        await writeBLE(printerCharacteristic, new Uint8Array([0x1B, 0x64, 0x02]));
+        // 2. Set line spacing to 12 dots (approx 1mm at 300 DPI)
+        console.log("[Manual Feed] Réglage de l'interligne à 12 points (1mm)...");
+        await writeBLE(printerCharacteristic, new Uint8Array([0x1B, 0x33, 12]));
+        
+        // 3. Send feed line command using writeBLE (ESC d 5 - feeds 5 lines = 5mm)
+        console.log("[Manual Feed] Envoi de la commande de défilement par lignes (ESC d 5)...");
+        await writeBLE(printerCharacteristic, new Uint8Array([0x1B, 0x64, 0x05]));
         console.log("[Manual Feed] Avancement manuel exécuté");
       } catch (e) {
         console.error("[Manual Feed] Échec de l'avancement manuel :", e);
@@ -3228,10 +3371,13 @@
         printProgressSub.textContent = "Finalisation du saut de mire...";
         const feedMM = parseFloat(settings.feedLengthMM);
         if (feedMM > 0) {
-          const feedLines = Math.max(1, Math.round(feedMM / 3));
-          console.log(`[Test Pattern Feed] Envoi de ESC d ${feedLines}`);
+          console.log("[Test Pattern Feed] Réglage de l'interligne à 12 points (1mm)...");
+          await writeBLE(printerCharacteristic, new Uint8Array([0x1B, 0x33, 12]));
+          
+          const feedLines = Math.max(1, Math.round(feedMM));
+          console.log(`[Test Pattern Feed] Envoi de ESC d ${feedLines} (pour ${feedMM}mm)`);
           await writeBLE(printerCharacteristic, new Uint8Array([0x1B, 0x64, feedLines]));
-          await sleep(feedLines * 150);
+          await sleep(feedLines * 50);
         }
 
         // 5. Send Shutdown
