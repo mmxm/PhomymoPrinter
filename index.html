@@ -914,7 +914,7 @@
 
   <script>
     // Constants & Configuration
-    const APP_VERSION = 'v1.0.24';
+    const APP_VERSION = 'v1.0.25';
     const DPI = 300;
     const MM_TO_INCH = 25.4;
     const PIXEL_RATIO = DPI / MM_TO_INCH; // dots per mm (approx 11.81 dots/mm)
@@ -3038,21 +3038,11 @@
         printProgressSub.textContent = "Finalisation de la découpe...";
         const feedMM = parseFloat(settings.feedLengthMM);
         if (feedMM > 0) {
-          // Calculate lines to feed based on DPI
-          // 300 DPI = 11.81 lines/mm (dots)
-          const feedLines = Math.round(feedMM * PIXEL_RATIO);
-          // Send ESC J [dots] (feed dot lines)
-          let linesRemaining = feedLines;
-          while (linesRemaining > 0) {
-            if (!printerDevice || !printerDevice.gatt.connected) {
-              throw new Error("Connexion perdue avec l'imprimante");
-            }
-            const feedChunk = Math.min(255, linesRemaining);
-            await writeBLE(printerCharacteristic, new Uint8Array([0x1B, 0x4A, feedChunk]));
-            linesRemaining -= feedChunk;
-            const feedDuration = Math.max(50, Math.round(feedChunk * 7));
-            await sleep(feedDuration);
-          }
+          // Convertir les mm en nombre de lignes (approx 3mm par ligne)
+          const feedLines = Math.max(1, Math.round(feedMM / 3));
+          console.log(`[Print Feed] Envoi de ESC d ${feedLines} (pour ${feedMM}mm)`);
+          await writeBLE(printerCharacteristic, new Uint8Array([0x1B, 0x64, feedLines]));
+          await sleep(feedLines * 150);
         }
 
         // 5. Send Shutdown / tasks complete commands
@@ -3081,18 +3071,15 @@
         return;
       }
       try {
-        const feedLines = Math.round(5 * PIXEL_RATIO); // 5mm manual feed per click
-        console.log(`[Manual Feed] Calcul de feedLines : 5mm = ${feedLines} lignes (PIXEL_RATIO = ${PIXEL_RATIO})`);
-        
         // 1. Wake up and initialize printer first using writeBLE
         console.log("[Manual Feed] Envoi de ESC @ (Initialisation/Éveil)...");
         await writeBLE(printerCharacteristic, new Uint8Array([0x1B, 0x40]));
         await sleep(50);
         
-        // 2. Send feed command using writeBLE
-        console.log("[Manual Feed] Envoi de la commande de défilement (ESC J)...");
-        await writeBLE(printerCharacteristic, new Uint8Array([0x1B, 0x4A, feedLines]));
-        console.log("[Manual Feed] Avancement manuel de 5mm envoyé et exécuté via writeBLE");
+        // 2. Send feed line command using writeBLE (ESC d 2 - feeds 2 lines)
+        console.log("[Manual Feed] Envoi de la commande de défilement par lignes (ESC d 2)...");
+        await writeBLE(printerCharacteristic, new Uint8Array([0x1B, 0x64, 0x02]));
+        console.log("[Manual Feed] Avancement manuel exécuté");
       } catch (e) {
         console.error("[Manual Feed] Échec de l'avancement manuel :", e);
         alert("Erreur de connexion lors de l'avancement : " + e.message);
@@ -3241,15 +3228,10 @@
         printProgressSub.textContent = "Finalisation du saut de mire...";
         const feedMM = parseFloat(settings.feedLengthMM);
         if (feedMM > 0) {
-          const feedLines = Math.round(feedMM * PIXEL_RATIO);
-          let linesRemaining = feedLines;
-          while (linesRemaining > 0) {
-            const feedChunk = Math.min(255, linesRemaining);
-            await writeBLE(printerCharacteristic, new Uint8Array([0x1B, 0x4A, feedChunk]));
-            linesRemaining -= feedChunk;
-            const feedDuration = Math.max(50, Math.round(feedChunk * 7));
-            await sleep(feedDuration);
-          }
+          const feedLines = Math.max(1, Math.round(feedMM / 3));
+          console.log(`[Test Pattern Feed] Envoi de ESC d ${feedLines}`);
+          await writeBLE(printerCharacteristic, new Uint8Array([0x1B, 0x64, feedLines]));
+          await sleep(feedLines * 150);
         }
 
         // 5. Send Shutdown
