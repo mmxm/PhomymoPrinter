@@ -917,7 +917,7 @@
 
   <script>
     // Constants & Configuration
-    const APP_VERSION = 'v1.0.28';
+    const APP_VERSION = 'v1.0.29';
     const DPI = 300;
     const MM_TO_INCH = 25.4;
     const PIXEL_RATIO = DPI / MM_TO_INCH; // dots per mm (approx 11.81 dots/mm)
@@ -3116,6 +3116,20 @@
       render();
       const printJob = generatePrintData();
       
+      // Pad the print job with feedLengthMM of white pixels to achieve pixel-perfect, dot-level precision feed!
+      const feedMM = parseFloat(settings.feedLengthMM);
+      if (feedMM > 0) {
+        const feedLines = Math.round(feedMM * PIXEL_RATIO);
+        if (feedLines > 0) {
+          const extraBytes = printJob.bytesPerLine * feedLines;
+          const paddedData = new Uint8Array(printJob.data.length + extraBytes);
+          paddedData.set(printJob.data); // Le reste est à 0x00 (blanc) par défaut
+          printJob.data = paddedData;
+          printJob.heightLines += feedLines;
+          console.log(`[Print Feed] Ajout de ${feedLines} lignes blanches à l'image (soit ${feedMM}mm de saut précis à 300 DPI)`);
+        }
+      }
+
       // Update UI Progress Overlay
       isPrintingCancelled = false;
       printOverlay.style.display = 'flex';
@@ -3177,19 +3191,11 @@
           await sleep(12);
         }
 
-        // 4. Send paper feed command (Feed)
+        // Wait for the motor to finish printing the white padding before shutting down
         printProgressSub.textContent = "Finalisation de la découpe...";
-        const feedMM = parseFloat(settings.feedLengthMM);
-        if (feedMM > 0) {
-          // Hauteur de ligne par défaut calibrée de 5.08mm
-          const LINE_HEIGHT_MM = 5.08;
-          const feedLines = Math.max(1, Math.round(feedMM / LINE_HEIGHT_MM));
-          console.log(`[Print Feed] Envoi de ESC d ${feedLines} (pour ${feedMM}mm à 5.08mm/ligne)`);
-          await writeBLE(printerCharacteristic, new Uint8Array([0x1B, 0x64, feedLines]));
-          await sleep(feedLines * 150);
-        }
+        await sleep(800);
 
-        // 5. Send Shutdown / tasks complete commands
+        // 4. Send Shutdown / tasks complete commands
         await writeBLE(printerCharacteristic, new Uint8Array([0x1F, 0x11, 0x08]));
         await writeBLE(printerCharacteristic, new Uint8Array([0x1F, 0x11, 0x0E]));
         await sleep(50);
@@ -3328,6 +3334,22 @@
           }
         }
 
+        // Pad the test pattern with feedLengthMM of white pixels to achieve pixel-perfect, dot-level precision feed!
+        const feedMM = parseFloat(settings.feedLengthMM);
+        let finalHeight = height;
+        let finalRawBytes = rawBytes;
+        
+        if (feedMM > 0) {
+          const feedLines = Math.round(feedMM * PIXEL_RATIO);
+          if (feedLines > 0) {
+            finalHeight += feedLines;
+            const extraBytes = bytesPerLine * feedLines;
+            finalRawBytes = new Uint8Array(rawBytes.length + extraBytes);
+            finalRawBytes.set(rawBytes); // Le reste est à 0x00 (blanc) par défaut
+            console.log(`[Test Pattern Feed] Ajout de ${feedLines} lignes blanches à la mire (soit ${feedMM}mm de saut précis à 300 DPI)`);
+          }
+        }
+
         // 3. Send raw print commands
         printProgressTitle.textContent = "Impression de la mire...";
         printProgressSub.textContent = "Connexion caractéristique...";
@@ -3343,7 +3365,7 @@
         // Print raster command header
         const xL = bytesPerLine & 0xFF;
         const xH = (bytesPerLine >> 8) & 0xFF;
-        const heightVal = height - 1; // Protocol height - 1
+        const heightVal = finalHeight - 1; // Protocol height - 1
         const yL = heightVal & 0xFF;
         const yH = (heightVal >> 8) & 0xFF;
         
@@ -3354,7 +3376,7 @@
         // Send packed data in chunks
         const chunkSize = 120;
         let sentBytes = 0;
-        const totalBytes = rawBytes.length;
+        const totalBytes = finalRawBytes.length;
 
         while (sentBytes < totalBytes) {
           if (isPrintingCancelled) {
@@ -3363,7 +3385,7 @@
           }
 
           const end = Math.min(sentBytes + chunkSize, totalBytes);
-          const chunk = rawBytes.slice(sentBytes, end);
+          const chunk = finalRawBytes.slice(sentBytes, end);
           await writeBLE(printerCharacteristic, chunk);
           sentBytes = end;
 
@@ -3372,18 +3394,11 @@
           await sleep(12);
         }
 
-        // 4. Send paper feed command (Feed)
+        // Wait for the motor to finish printing the white padding before shutting down
         printProgressSub.textContent = "Finalisation du saut de mire...";
-        const feedMM = parseFloat(settings.feedLengthMM);
-        if (feedMM > 0) {
-          const LINE_HEIGHT_MM = 5.08;
-          const feedLines = Math.max(1, Math.round(feedMM / LINE_HEIGHT_MM));
-          console.log(`[Test Pattern Feed] Envoi de ESC d ${feedLines} (pour ${feedMM}mm à 5.08mm/ligne)`);
-          await writeBLE(printerCharacteristic, new Uint8Array([0x1B, 0x64, feedLines]));
-          await sleep(feedLines * 150);
-        }
+        await sleep(800);
 
-        // 5. Send Shutdown
+        // 4. Send Shutdown
         await writeBLE(printerCharacteristic, new Uint8Array([0x1F, 0x11, 0x08]));
         await writeBLE(printerCharacteristic, new Uint8Array([0x1F, 0x11, 0x0E]));
         await sleep(50);
