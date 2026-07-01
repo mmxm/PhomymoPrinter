@@ -327,15 +327,15 @@
 
     .canvas-wrapper {
       position: relative;
-      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
-      background-color: white;
+      background-color: #e8e8e8;
       border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
     }
 
     /* Actual Canvas */
     canvas#editorCanvas {
       display: block;
-      background-color: white;
       cursor: default;
     }
 
@@ -754,19 +754,19 @@
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 0.5rem;">
             <div class="form-group" style="margin-bottom: 0;">
               <label for="inputPropX" style="font-size: 0.7rem;">Position X (px)</label>
-              <input type="number" id="inputPropX" min="0" max="624" style="padding: 0.25rem; font-size: 0.75rem;">
+              <input type="number" id="inputPropX" min="-1000" max="3000" style="padding: 0.25rem; font-size: 0.75rem;">
             </div>
             <div class="form-group" style="margin-bottom: 0;">
               <label for="inputPropY" style="font-size: 0.7rem;">Position Y (px)</label>
-              <input type="number" id="inputPropY" min="0" max="2000" style="padding: 0.25rem; font-size: 0.75rem;">
+              <input type="number" id="inputPropY" min="-2000" max="6000" style="padding: 0.25rem; font-size: 0.75rem;">
             </div>
             <div class="form-group" style="margin-bottom: 0;">
               <label for="inputPropW" style="font-size: 0.7rem;">Largeur (px)</label>
-              <input type="number" id="inputPropW" min="10" max="624" style="padding: 0.25rem; font-size: 0.75rem;">
+              <input type="number" id="inputPropW" min="5" max="3000" style="padding: 0.25rem; font-size: 0.75rem;">
             </div>
             <div class="form-group" style="margin-bottom: 0;">
               <label for="inputPropH" style="font-size: 0.7rem;">Hauteur (px)</label>
-              <input type="number" id="inputPropH" min="10" max="2000" style="padding: 0.25rem; font-size: 0.75rem;">
+              <input type="number" id="inputPropH" min="5" max="6000" style="padding: 0.25rem; font-size: 0.75rem;">
             </div>
           </div>
 
@@ -914,10 +914,14 @@
 
   <script>
     // Constants & Configuration
-    const APP_VERSION = 'v1.0.15';
+    const APP_VERSION = 'v1.0.16';
     const DPI = 300;
     const MM_TO_INCH = 25.4;
     const PIXEL_RATIO = DPI / MM_TO_INCH; // dots per mm (approx 11.81 dots/mm)
+    const WORKSPACE_PADDING_X = 120;
+    const WORKSPACE_PADDING_Y = 80;
+    let activeSnapX = null;
+    let activeSnapY = null;
 
     // App State
     let printerDevice = null;
@@ -1316,7 +1320,7 @@
     function updateCanvasSize() {
       const { leftMarginPx, rightMarginPx, printableWidthPx } = getAlignedMargins();
       
-      canvas.width = 624;
+      canvas.width = 624 + WORKSPACE_PADDING_X * 2;
       
       if (lblStartMM) lblStartMM.textContent = (leftMarginPx / PIXEL_RATIO).toFixed(1) + ' mm';
       if (lblEndMM) lblEndMM.textContent = ((624 - rightMarginPx) / PIXEL_RATIO).toFixed(1) + ' mm';
@@ -1324,17 +1328,17 @@
       // Height calculation
       if (settings.heightMode === 'fixed') {
         const heightMM = parseFloat(settings.labelHeightMM);
-        canvas.height = Math.round(heightMM * PIXEL_RATIO);
+        canvas.height = Math.round(heightMM * PIXEL_RATIO) + WORKSPACE_PADDING_Y * 2;
       } else {
         // Continuous mode: dynamically determine height based on elements
-        let maxBottom = 150; // Minimum default canvas height in pixels
+        let maxBottom = WORKSPACE_PADDING_Y + 150; // Minimum default bottom (padding + 150px label height)
         elements.forEach(el => {
           const bottom = el.y + el.height;
           if (bottom > maxBottom) {
             maxBottom = bottom;
           }
         });
-        canvas.height = Math.max(150, maxBottom + 20); // add padding at the bottom
+        canvas.height = maxBottom + WORKSPACE_PADDING_Y;
       }
 
       // Apply Zoom scaling to the wrapper div
@@ -1804,13 +1808,14 @@
 
     // Element Management
     function addElement(type) {
-      // Default positions and dimensions
-      const startX = Math.round(canvas.width / 4);
-      const startY = Math.round(canvas.height / 4);
+      const labelHeight = (settings.heightMode === 'fixed') 
+        ? Math.round(parseFloat(settings.labelHeightMM) * PIXEL_RATIO) 
+        : 150;
+      
       let el = {
         type: type,
-        x: startX,
-        y: startY,
+        x: WORKSPACE_PADDING_X + 50,
+        y: WORKSPACE_PADDING_Y + 30,
         width: 100,
         height: 40,
         rotation: 0
@@ -1861,6 +1866,10 @@
         el.strokeWidth = 3;
       }
 
+      // Center exactly in the printable white label
+      el.x = Math.round(WORKSPACE_PADDING_X + (624 - el.width) / 2);
+      el.y = Math.round(WORKSPACE_PADDING_Y + (labelHeight - el.height) / 2);
+
       elements.push(el);
       selectedElementIndex = elements.length - 1;
       pushHistory();
@@ -1878,7 +1887,8 @@
         const img = new Image();
         img.onload = function() {
           // Adjust image size to fit canvas, maintaining aspect ratio
-          const maxW = Math.round(canvas.width * 0.7);
+          const labelHeight = canvas.height - WORKSPACE_PADDING_Y * 2;
+          const maxW = Math.round(624 * 0.7);
           let w = img.width;
           let h = img.height;
           if (w > maxW) {
@@ -1886,8 +1896,8 @@
             w = maxW;
           }
 
-          const startX = Math.round((canvas.width - w) / 2);
-          const startY = Math.round((canvas.height - h) / 4);
+          const startX = Math.round(WORKSPACE_PADDING_X + (624 - w) / 2);
+          const startY = Math.round(WORKSPACE_PADDING_Y + (labelHeight - h) / 2);
 
           const el = {
             type: 'image',
@@ -2127,13 +2137,83 @@
         const dx = x - dragStartX;
         const dy = y - dragStartY;
         
-        // Grid snapping (5px snapping)
-        el.x = Math.round((dragOffsetLeft + dx) / 5) * 5;
-        el.y = Math.round((dragOffsetTop + dy) / 5) * 5;
+        // 1. Grid snapping (5px snapping)
+        let targetX = Math.round((dragOffsetLeft + dx) / 5) * 5;
+        let targetY = Math.round((dragOffsetTop + dy) / 5) * 5;
         
-        // Boundaries checks
-        el.x = Math.max(-el.width + 10, Math.min(canvas.width - 10, el.x));
-        el.y = Math.max(-el.height + 10, Math.min(canvas.height - 10, el.y));
+        // 2. Magnetic snapping (alignment guidelines)
+        activeSnapX = null;
+        activeSnapY = null;
+        
+        // Get aligned margins
+        const { leftMarginPx, rightMarginPx } = getAlignedMargins();
+        
+        // Horizontal snap targets (X coordinates)
+        const snapTargetsX = [
+          WORKSPACE_PADDING_X, // Left edge of label
+          WORKSPACE_PADDING_X + 624, // Right edge of label
+          WORKSPACE_PADDING_X + leftMarginPx, // Left safety margin edge
+          WORKSPACE_PADDING_X + 624 - rightMarginPx, // Right safety margin edge
+          WORKSPACE_PADDING_X + leftMarginPx + (624 - leftMarginPx - rightMarginPx) / 2 // Horizontal center of printable area
+        ];
+        
+        // Vertical snap targets (Y coordinates)
+        const labelHeight = canvas.height - WORKSPACE_PADDING_Y * 2;
+        const snapTargetsY = [
+          WORKSPACE_PADDING_Y, // Top edge of label
+          WORKSPACE_PADDING_Y + labelHeight, // Bottom edge of label
+          WORKSPACE_PADDING_Y + labelHeight / 2 // Vertical center of label
+        ];
+        
+        const snapThreshold = 5; // Pixels
+        
+        // Check X alignments
+        for (const snapX of snapTargetsX) {
+          // Left edge of element
+          if (Math.abs(targetX - snapX) < snapThreshold) {
+            targetX = snapX;
+            activeSnapX = snapX;
+            break;
+          }
+          // Center of element
+          if (Math.abs((targetX + el.width / 2) - snapX) < snapThreshold) {
+            targetX = snapX - el.width / 2;
+            activeSnapX = snapX;
+            break;
+          }
+          // Right edge of element
+          if (Math.abs((targetX + el.width) - snapX) < snapThreshold) {
+            targetX = snapX - el.width;
+            activeSnapX = snapX;
+            break;
+          }
+        }
+        
+        // Check Y alignments
+        for (const snapY of snapTargetsY) {
+          // Top edge of element
+          if (Math.abs(targetY - snapY) < snapThreshold) {
+            targetY = snapY;
+            activeSnapY = snapY;
+            break;
+          }
+          // Center of element
+          if (Math.abs((targetY + el.height / 2) - snapY) < snapThreshold) {
+            targetY = snapY - el.height / 2;
+            activeSnapY = snapY;
+            break;
+          }
+          // Bottom edge of element
+          if (Math.abs((targetY + el.height) - snapY) < snapThreshold) {
+            targetY = snapY - el.height;
+            activeSnapY = snapY;
+            break;
+          }
+        }
+        
+        // Bounds relative to extended canvas
+        el.x = Math.max(-el.width + 10, Math.min(canvas.width - 10, targetX));
+        el.y = Math.max(-el.height + 10, Math.min(canvas.height - 10, targetY));
 
         if (settings.heightMode === 'auto') {
           updateCanvasSize();
@@ -2184,11 +2264,14 @@
     }
 
     function handleCanvasMouseUp() {
+      activeSnapX = null;
+      activeSnapY = null;
       if (isDragging || isResizing) {
         isDragging = false;
         isResizing = false;
         pushHistory();
       }
+      render();
     }
 
     // Property panel synchronization
@@ -2356,9 +2439,43 @@
 
     // Render Canvas
     function render() {
-      // Clear main editing canvas
-      ctx.fillStyle = '#ffffff';
+      // 1. Draw checkerboard pattern on the entire canvas
+      const checkerSize = 10;
+      ctx.fillStyle = '#e8e8e8';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#f5f5f5';
+      for (let y = 0; y < canvas.height; y += checkerSize) {
+        for (let x = (y / checkerSize) % 2 === 0 ? 0 : checkerSize; x < canvas.width; x += checkerSize * 2) {
+          ctx.fillRect(x, y, checkerSize, checkerSize);
+        }
+      }
+
+      // 2. Draw the white rounded rectangle label at the center
+      const labelW = 624;
+      const labelH = canvas.height - WORKSPACE_PADDING_Y * 2;
+      ctx.save();
+      // Draw subtle shadow for the label card
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.15)';
+      ctx.shadowBlur = 10;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 4;
+      ctx.fillStyle = '#ffffff';
+      
+      // Draw rounded rectangle
+      ctx.beginPath();
+      const radius = 8;
+      ctx.moveTo(WORKSPACE_PADDING_X + radius, WORKSPACE_PADDING_Y);
+      ctx.lineTo(WORKSPACE_PADDING_X + labelW - radius, WORKSPACE_PADDING_Y);
+      ctx.quadraticCurveTo(WORKSPACE_PADDING_X + labelW, WORKSPACE_PADDING_Y, WORKSPACE_PADDING_X + labelW, WORKSPACE_PADDING_Y + radius);
+      ctx.lineTo(WORKSPACE_PADDING_X + labelW, WORKSPACE_PADDING_Y + labelH - radius);
+      ctx.quadraticCurveTo(WORKSPACE_PADDING_X + labelW, WORKSPACE_PADDING_Y + labelH, WORKSPACE_PADDING_X + labelW - radius, WORKSPACE_PADDING_Y + labelH);
+      ctx.lineTo(WORKSPACE_PADDING_X + radius, WORKSPACE_PADDING_Y + labelH);
+      ctx.quadraticCurveTo(WORKSPACE_PADDING_X, WORKSPACE_PADDING_Y + labelH, WORKSPACE_PADDING_X, WORKSPACE_PADDING_Y + labelH - radius);
+      ctx.lineTo(WORKSPACE_PADDING_X, WORKSPACE_PADDING_Y + radius);
+      ctx.quadraticCurveTo(WORKSPACE_PADDING_X, WORKSPACE_PADDING_Y, WORKSPACE_PADDING_X + radius, WORKSPACE_PADDING_Y);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
 
       elements.forEach((el, index) => {
         ctx.save();
@@ -2542,35 +2659,63 @@
 
       // Draw grid overlay for non-printable margins (translucent diagonal lines)
       const { leftMarginPx, rightMarginPx } = getAlignedMargins();
+      const labelH = canvas.height - WORKSPACE_PADDING_Y * 2;
 
       ctx.save();
-      ctx.fillStyle = 'rgba(220, 38, 38, 0.15)';
-      ctx.strokeStyle = 'rgba(220, 38, 38, 0.4)';
+      // Clip margins to the printable white label card boundaries
+      ctx.beginPath();
+      ctx.rect(WORKSPACE_PADDING_X, WORKSPACE_PADDING_Y, 624, labelH);
+      ctx.clip();
+
+      ctx.fillStyle = 'rgba(220, 38, 38, 0.1)';
+      ctx.strokeStyle = 'rgba(220, 38, 38, 0.3)';
       ctx.lineWidth = 1;
 
       // Draw left margin mask
       if (leftMarginPx > 0) {
-        ctx.fillRect(0, 0, leftMarginPx, canvas.height);
+        ctx.fillRect(WORKSPACE_PADDING_X, WORKSPACE_PADDING_Y, leftMarginPx, labelH);
         ctx.beginPath();
-        for (let y = -leftMarginPx; y < canvas.height; y += 12) {
-          ctx.moveTo(0, y);
-          ctx.lineTo(leftMarginPx, y + leftMarginPx);
+        for (let y = WORKSPACE_PADDING_Y - leftMarginPx; y < WORKSPACE_PADDING_Y + labelH; y += 12) {
+          ctx.moveTo(WORKSPACE_PADDING_X, y);
+          ctx.lineTo(WORKSPACE_PADDING_X + leftMarginPx, y + leftMarginPx);
         }
         ctx.stroke();
       }
 
       // Draw right margin mask
       if (rightMarginPx > 0) {
-        const startX = canvas.width - rightMarginPx;
-        ctx.fillRect(startX, 0, rightMarginPx, canvas.height);
+        const startX = WORKSPACE_PADDING_X + 624 - rightMarginPx;
+        ctx.fillRect(startX, WORKSPACE_PADDING_Y, rightMarginPx, labelH);
         ctx.beginPath();
-        for (let y = -rightMarginPx; y < canvas.height; y += 12) {
+        for (let y = WORKSPACE_PADDING_Y - rightMarginPx; y < WORKSPACE_PADDING_Y + labelH; y += 12) {
           ctx.moveTo(startX, y);
-          ctx.lineTo(canvas.width, y + rightMarginPx);
+          ctx.lineTo(WORKSPACE_PADDING_X + 624, y + rightMarginPx);
         }
         ctx.stroke();
       }
       ctx.restore();
+
+      // Draw active snap lines (magnetic guidelines)
+      if (activeSnapX !== null || activeSnapY !== null) {
+        ctx.save();
+        ctx.strokeStyle = 'rgba(220, 38, 38, 0.7)'; // red guidelines
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        
+        if (activeSnapX !== null) {
+          ctx.beginPath();
+          ctx.moveTo(activeSnapX, 0);
+          ctx.lineTo(activeSnapX, canvas.height);
+          ctx.stroke();
+        }
+        if (activeSnapY !== null) {
+          ctx.beginPath();
+          ctx.moveTo(0, activeSnapY);
+          ctx.lineTo(canvas.width, activeSnapY);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
 
       // Highlight active element and draw resize handles
       if (selectedElementIndex !== -1) {
@@ -2660,18 +2805,23 @@
       // 1. Create a canvas matching ONLY the printable area (excluding margins)
       const { leftMarginPx, rightMarginPx, printableWidthPx } = getAlignedMargins();
       const printableWidth = printableWidthPx;
+      const labelHeight = canvas.height - WORKSPACE_PADDING_Y * 2;
       
       const printCanvas = document.createElement('canvas');
       printCanvas.width = printableWidth;
-      printCanvas.height = canvas.height;
+      printCanvas.height = labelHeight;
       const pCtx = printCanvas.getContext('2d');
 
       // Draw white background
       pCtx.fillStyle = '#ffffff';
       pCtx.fillRect(0, 0, printCanvas.width, printCanvas.height);
 
-      // Copy elements offset by leftMarginPx
-      pCtx.drawImage(canvas, leftMarginPx, 0, printableWidth, canvas.height, 0, 0, printableWidth, canvas.height);
+      // Copy elements offset by leftMarginPx and WORKSPACE_PADDING_Y
+      pCtx.drawImage(
+        canvas, 
+        WORKSPACE_PADDING_X + leftMarginPx, WORKSPACE_PADDING_Y, printableWidth, labelHeight, 
+        0, 0, printableWidth, labelHeight
+      );
 
       // 2. Read image data
       const imgData = pCtx.getImageData(0, 0, printCanvas.width, printCanvas.height);
@@ -2840,6 +2990,9 @@
           if (isPrintingCancelled) {
             throw new Error("Impression annulée par l'utilisateur");
           }
+          if (!printerDevice || !printerDevice.gatt.connected) {
+            throw new Error("Connexion perdue avec l'imprimante");
+          }
 
           const end = Math.min(sentBytes + chunkSize, totalBytes);
           const chunk = rawBytes.slice(sentBytes, end);
@@ -2866,6 +3019,9 @@
           // Send ESC J [dots] (feed dot lines)
           let linesRemaining = feedLines;
           while (linesRemaining > 0) {
+            if (!printerDevice || !printerDevice.gatt.connected) {
+              throw new Error("Connexion perdue avec l'imprimante");
+            }
             const feedChunk = Math.min(255, linesRemaining);
             await writeBLE(printerCharacteristic, new Uint8Array([0x1B, 0x4A, feedChunk]));
             linesRemaining -= feedChunk;
@@ -2892,16 +3048,17 @@
 
     // Manual Feed operation
     async function sendManualFeed() {
-      if (!printerCharacteristic) {
+      if (!printerDevice || !printerDevice.gatt.connected || !printerCharacteristic) {
         alert("Imprimante non connectée !");
         return;
       }
       try {
         const feedLines = Math.round(5 * PIXEL_RATIO); // 5mm manual feed per click
-        await writeBLE(printerCharacteristic, new Uint8Array([0x1B, 0x4A, feedLines]));
-        console.log("Avancement manuel de 5mm envoyé");
+        await printerCharacteristic.writeValue(new Uint8Array([0x1B, 0x4A, feedLines]));
+        console.log("Avancement manuel de 5mm envoyé avec réponse");
       } catch (e) {
         console.error("Échec d'avancement manuel :", e);
+        alert("Erreur de connexion lors de l'avancement : " + e.message);
       }
     }
 
