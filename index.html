@@ -914,7 +914,7 @@
 
   <script>
     // Constants & Configuration
-    const APP_VERSION = 'v1.0.13';
+    const APP_VERSION = 'v1.0.14';
     const DPI = 300;
     const MM_TO_INCH = 25.4;
     const PIXEL_RATIO = DPI / MM_TO_INCH; // dots per mm (approx 11.81 dots/mm)
@@ -2773,6 +2773,19 @@
       return new Promise(resolve => setTimeout(resolve, ms));
     }
 
+    async function writeBLE(characteristic, chunk) {
+      if (typeof characteristic.writeValueWithoutResponse === 'function') {
+        try {
+          await characteristic.writeValueWithoutResponse(chunk);
+        } catch (e) {
+          console.warn("writeValueWithoutResponse failed, falling back to writeValue", e);
+          await characteristic.writeValue(chunk);
+        }
+      } else {
+        await characteristic.writeValue(chunk);
+      }
+    }
+
     // Web Bluetooth Printer Driver logic
     async function printLabel() {
       if (!printerCharacteristic) {
@@ -2795,10 +2808,10 @@
       try {
         // 1. Send initialization commands
         // ESC @ (Initialize)
-        await printerCharacteristic.writeValue(new Uint8Array([0x1B, 0x40]));
+        await writeBLE(printerCharacteristic, new Uint8Array([0x1B, 0x40]));
         // Config commands: Density setting and printing speed setting
-        await printerCharacteristic.writeValue(new Uint8Array([0x1B, 0x61, 0x01])); // center alignment
-        await printerCharacteristic.writeValue(new Uint8Array([0x1F, 0x11, 0x02, 0x04])); // density = 4
+        await writeBLE(printerCharacteristic, new Uint8Array([0x1B, 0x61, 0x01])); // center alignment
+        await writeBLE(printerCharacteristic, new Uint8Array([0x1F, 0x11, 0x02, 0x04])); // density = 4
         await sleep(50);
 
         // 2. Prepare Raster Image Commands: GS v 0 0
@@ -2812,12 +2825,12 @@
         const dims = new Uint8Array([xL, xH, yL, yH]);
 
         const fullCommandHeader = new Uint8Array([...header, ...dims]);
-        await printerCharacteristic.writeValue(fullCommandHeader);
+        await writeBLE(printerCharacteristic, fullCommandHeader);
         await sleep(30);
 
         // 3. Write image data with throttling
         const rawBytes = printJob.data;
-        const chunkSize = 200; // Chunk size in bytes for BLE transmissions
+        const chunkSize = 120; // Chunk size in bytes for BLE transmissions (stable MTU payload size)
         const totalBytes = rawBytes.length;
         let sentBytes = 0;
 
@@ -2831,7 +2844,7 @@
           const end = Math.min(sentBytes + chunkSize, totalBytes);
           const chunk = rawBytes.slice(sentBytes, end);
           
-          await printerCharacteristic.writeValue(chunk);
+          await writeBLE(printerCharacteristic, chunk);
           sentBytes = end;
 
           // Update progress
@@ -2839,8 +2852,8 @@
           printProgressBar.style.width = progress + '%';
           printProgressSub.textContent = `Lignes envoyées : ${Math.round(sentBytes / printJob.bytesPerLine)} / ${printJob.heightLines}`;
           
-          // Deliberate throttle sleep to avoid overflow of printer buffer
-          await sleep(18);
+          // Throttling delay optimized for writeValueWithoutResponse to prevent buffer overflow
+          await sleep(12);
         }
 
         // 4. Send paper feed command (Feed)
@@ -2854,15 +2867,15 @@
           let linesRemaining = feedLines;
           while (linesRemaining > 0) {
             const feedChunk = Math.min(255, linesRemaining);
-            await printerCharacteristic.writeValue(new Uint8Array([0x1B, 0x4A, feedChunk]));
+            await writeBLE(printerCharacteristic, new Uint8Array([0x1B, 0x4A, feedChunk]));
             linesRemaining -= feedChunk;
             await sleep(50);
           }
         }
 
         // 5. Send Shutdown / tasks complete commands
-        await printerCharacteristic.writeValue(new Uint8Array([0x1F, 0x11, 0x08]));
-        await printerCharacteristic.writeValue(new Uint8Array([0x1F, 0x11, 0x0E]));
+        await writeBLE(printerCharacteristic, new Uint8Array([0x1F, 0x11, 0x08]));
+        await writeBLE(printerCharacteristic, new Uint8Array([0x1F, 0x11, 0x0E]));
         await sleep(50);
 
         printProgressTitle.textContent = "Impression terminée !";
@@ -2885,7 +2898,7 @@
       }
       try {
         const feedLines = Math.round(5 * PIXEL_RATIO); // 5mm manual feed per click
-        await printerCharacteristic.writeValue(new Uint8Array([0x1B, 0x4A, feedLines]));
+        await writeBLE(printerCharacteristic, new Uint8Array([0x1B, 0x4A, feedLines]));
         console.log("Avancement manuel de 5mm envoyé");
       } catch (e) {
         console.error("Échec d'avancement manuel :", e);
@@ -2991,11 +3004,11 @@
         printProgressSub.textContent = "Connexion caractéristique...";
         
         // Initialize
-        await printerCharacteristic.writeValue(new Uint8Array([0x1B, 0x40]));
+        await writeBLE(printerCharacteristic, new Uint8Array([0x1B, 0x40]));
         // Alignment: left
-        await printerCharacteristic.writeValue(new Uint8Array([0x1B, 0x61, 0x00]));
+        await writeBLE(printerCharacteristic, new Uint8Array([0x1B, 0x61, 0x00]));
         // Density: normal
-        await printerCharacteristic.writeValue(new Uint8Array([0x1F, 0x11, 0x02, 0x04]));
+        await writeBLE(printerCharacteristic, new Uint8Array([0x1F, 0x11, 0x02, 0x04]));
         await sleep(50);
 
         // Print raster command header
@@ -3006,11 +3019,11 @@
         const yH = (heightVal >> 8) & 0xFF;
         
         const header = new Uint8Array([0x1D, 0x76, 0x30, 0x00, xL, xH, yL, yH]);
-        await printerCharacteristic.writeValue(header);
+        await writeBLE(printerCharacteristic, header);
         await sleep(20);
 
         // Send packed data in chunks
-        const chunkSize = 200;
+        const chunkSize = 120;
         let sentBytes = 0;
         const totalBytes = rawBytes.length;
 
@@ -3022,12 +3035,12 @@
 
           const end = Math.min(sentBytes + chunkSize, totalBytes);
           const chunk = rawBytes.slice(sentBytes, end);
-          await printerCharacteristic.writeValue(chunk);
+          await writeBLE(printerCharacteristic, chunk);
           sentBytes = end;
 
           const progress = Math.round((sentBytes / totalBytes) * 100);
           printProgressBar.style.width = progress + '%';
-          await sleep(18);
+          await sleep(12);
         }
 
         // 4. Send paper feed command (Feed)
@@ -3038,15 +3051,15 @@
           let linesRemaining = feedLines;
           while (linesRemaining > 0) {
             const feedChunk = Math.min(255, linesRemaining);
-            await printerCharacteristic.writeValue(new Uint8Array([0x1B, 0x4A, feedChunk]));
+            await writeBLE(printerCharacteristic, new Uint8Array([0x1B, 0x4A, feedChunk]));
             linesRemaining -= feedChunk;
             await sleep(50);
           }
         }
 
         // 5. Send Shutdown
-        await printerCharacteristic.writeValue(new Uint8Array([0x1F, 0x11, 0x08]));
-        await printerCharacteristic.writeValue(new Uint8Array([0x1F, 0x11, 0x0E]));
+        await writeBLE(printerCharacteristic, new Uint8Array([0x1F, 0x11, 0x08]));
+        await writeBLE(printerCharacteristic, new Uint8Array([0x1F, 0x11, 0x0E]));
         await sleep(50);
 
         printProgressTitle.textContent = "Mire imprimée !";
