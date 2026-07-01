@@ -936,7 +936,7 @@
 
   <script>
     // Constants & Configuration
-    const APP_VERSION = 'v1.0.32';
+    const APP_VERSION = 'v1.0.33';
     const DPI = 300;
     const MM_TO_INCH = 25.4;
     const PIXEL_RATIO = DPI / MM_TO_INCH; // dots per mm (approx 11.81 dots/mm)
@@ -3011,7 +3011,9 @@
           ctx.stroke();
         }
         ctx.restore();
-        if (selectedElementIndex !== -1) {
+      }
+
+      if (selectedElementIndex !== -1) {
         const el = elements[selectedElementIndex];
         ctx.save();
         
