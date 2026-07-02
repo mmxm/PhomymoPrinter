@@ -924,11 +924,11 @@
             <div class="form-group">
               <label for="selectDithering">Algorithme de Tramage</label>
               <select id="selectDithering">
-                <option value="atkinson" selected>Atkinson (Recommandé)</option>
+                <option value="atkinson">Atkinson (Recommandé)</option>
                 <option value="floyd">Floyd-Steinberg</option>
                 <option value="stucki">Stucki (Photo nette)</option>
                 <option value="halftone">Trame Journal (Demi-teinte)</option>
-                <option value="none">Niveaux de Gris (Simple)</option>
+                <option value="none" selected>Niveaux de Gris (Simple)</option>
                 <option value="threshold">Seuil Simple (Binaire)</option>
               </select>
             </div>
@@ -1097,7 +1097,7 @@
 
   <script>
     // Constants & Configuration
-    const APP_VERSION = 'v1.0.44';
+    const APP_VERSION = 'v1.0.45';
     const DPI = 300;
     const MM_TO_INCH = 25.4;
     const PIXEL_RATIO = DPI / MM_TO_INCH; // dots per mm (approx 11.81 dots/mm)
@@ -2022,7 +2022,7 @@
                     rotation: 0,
                     imageObj: img,
                     src: event.target.result,
-                    dithering: 'atkinson',
+                    dithering: 'none',
                     contrast: 0,
                     brightness: 0,
                     threshold: 128,
@@ -2423,7 +2423,7 @@
             rotation: 0,
             imageObj: img,
             src: event.target.result, // save base64 for history/templates
-            dithering: 'atkinson',
+            dithering: 'none',
             contrast: 0,
             brightness: 0,
             threshold: 128,
