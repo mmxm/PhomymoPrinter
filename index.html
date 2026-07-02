@@ -254,6 +254,49 @@
       text-align: right;
     }
 
+    /* Segmented Controls (Pages style) */
+    .segmented-control {
+      display: flex;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+      background: var(--surface);
+    }
+    .segmented-control button {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      padding: 0.4rem 0.2rem;
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      transition: all 0.15s ease;
+      border-right: 1px solid var(--border);
+      border-radius: 0;
+    }
+    .segmented-control button:last-child {
+      border-right: none;
+    }
+    .segmented-control button:hover {
+      background-color: var(--surface-hover);
+      color: var(--text);
+    }
+    .segmented-control button.active {
+      background-color: var(--accent-dim);
+      color: var(--accent);
+      font-weight: 600;
+    }
+    
+    .segmented-control button svg {
+      width: 16px;
+      height: 16px;
+      fill: currentColor;
+    }
+
     /* Button rows */
     .button-grid {
       display: grid;
@@ -785,40 +828,73 @@
               <label for="inputTextContent">Texte</label>
               <textarea id="inputTextContent" rows="3" style="width: 100%; padding: 0.35rem; border-radius: 4px; border: 1px solid var(--border); background: var(--surface-card); color: var(--text); resize: vertical;"></textarea>
             </div>
+            
             <div class="form-group">
-              <label for="selectTextFont">Police</label>
-              <select id="selectTextFont">
-                <option value="Inter">Inter (Sans-serif)</option>
-                <option value="Outfit">Outfit (Moderne)</option>
-                <option value="Courier Prime">Courier Prime (Monospace)</option>
-                <option value="Playfair Display">Playfair Display (Serif)</option>
-                <option value="Roboto Mono">Roboto Mono</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label for="inputTextSize">Taille (px)</label>
-              <div class="input-row">
-                <input type="number" id="inputTextSize" min="6" max="150" value="24">
+              <label>Police</label>
+              <div style="display: flex; gap: 0.5rem; width: 100%;">
+                <select id="selectTextFont" style="flex: 2; min-width: 0;">
+                  <option value="Inter">Inter (Sans-serif)</option>
+                  <option value="Outfit">Outfit (Moderne)</option>
+                  <option value="Courier Prime">Courier Prime (Monospace)</option>
+                  <option value="Playfair Display">Playfair Display (Serif)</option>
+                  <option value="Roboto Mono">Roboto Mono</option>
+                </select>
+                <div style="display: flex; align-items: center; width: 85px; position: relative;">
+                  <input type="number" id="inputTextSize" min="6" max="150" value="24" style="text-align: center; padding-right: 1.5rem;">
+                  <span style="position: absolute; right: 0.5rem; font-size: 0.75rem; color: var(--text-secondary); pointer-events: none;">px</span>
+                </div>
               </div>
             </div>
+
             <div class="form-group">
-              <label for="inputTextWidth">Largeur Cadre (px)</label>
-              <div class="input-row">
-                <input type="number" id="inputTextWidth" min="20" max="624" value="250">
+              <div class="segmented-control">
+                <button id="btnTextBold" title="Gras" style="font-weight: bold;">B</button>
+                <button id="btnTextItalic" title="Italique" style="font-style: italic;">I</button>
+                <button id="btnTextUnderline" title="Souligné" style="text-decoration: underline;">U</button>
+                <button id="btnTextStrikethrough" title="Barré" style="text-decoration: line-through;">S</button>
               </div>
             </div>
+
             <div class="form-group">
-              <label for="selectTextAlign">Alignement</label>
-              <select id="selectTextAlign">
-                <option value="left">Gauche</option>
-                <option value="center">Centré</option>
-                <option value="right">Droite</option>
-                <option value="justify">Justifié</option>
-              </select>
+              <label>Alignement</label>
+              <div class="segmented-control" id="alignSegmentedGroup">
+                <button id="btnAlignLeft" title="Gauche">
+                  <svg viewBox="0 0 24 24"><path d="M15 15H3v2h12v-2zm0-8H3v2h12V7zM3 13h18v-2H3v2zm0 8h18v-2H3v2zM3 3v2h18V3H3z"/></svg>
+                </button>
+                <button id="btnAlignCenter" title="Centré">
+                  <svg viewBox="0 0 24 24"><path d="M20 11H4v2h16v-2zm-2 4H6v2h12v-2zM10 7H4v2h6V7zm10 0h-8v2h8V7zM4 19h16v-2H4v2zm2-16v2h12V3H6z"/></svg>
+                </button>
+                <button id="btnAlignRight" title="Droite">
+                  <svg viewBox="0 0 24 24"><path d="M3 21h18v-2H3v2zm6-4h12v-2H9v2zm-6-4h18v-2H3v2zm6-4h12V7H9v2zM3 3v2h18V3H3z"/></svg>
+                </button>
+                <button id="btnAlignJustify" title="Justifié">
+                  <svg viewBox="0 0 24 24"><path d="M3 21h18v-2H3v2zm0-4h18v-2H3v2zm0-4h18v-2H3v2zm0-4h18V7H3v2zm0-6v2h18V3H3z"/></svg>
+                </button>
+              </div>
             </div>
-            <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
-              <button id="btnTextBold" style="flex: 1; justify-content: center; padding: 0.4rem;">Gras</button>
-              <button id="btnTextItalic" style="flex: 1; justify-content: center; padding: 0.4rem;">Italique</button>
+
+            <div class="form-group">
+              <label for="inputTextLineHeight">Espacement des lignes</label>
+              <div class="input-row">
+                <input type="number" id="inputTextLineHeight" min="0.8" max="3" step="0.1" value="1.2">
+                <span style="font-size: 0.85rem; color: var(--text-secondary);">x</span>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="inputTextWidth">Largeur cadre (px)</label>
+              <input type="number" id="inputTextWidth" min="20" max="624" value="250">
+            </div>
+
+            <div class="form-group" style="border-top: 1px solid var(--border); padding-top: 1rem; margin-top: 1rem;">
+              <label for="selectTextListStyle">Puces et listes</label>
+              <select id="selectTextListStyle">
+                <option value="none" selected>Aucun</option>
+                <option value="bullet">Puces (•)</option>
+                <option value="checkbox">Cases à cocher (☐)</option>
+                <option value="checkbox-checked">Cases à cocher (cochées ☑)</option>
+                <option value="numbered">Numérotée (1, 2, 3)</option>
+              </select>
             </div>
           </div>
 
@@ -956,7 +1032,7 @@
 
   <script>
     // Constants & Configuration
-    const APP_VERSION = 'v1.0.35';
+    const APP_VERSION = 'v1.0.36';
     const DPI = 300;
     const MM_TO_INCH = 25.4;
     const PIXEL_RATIO = DPI / MM_TO_INCH; // dots per mm (approx 11.81 dots/mm)
@@ -1067,8 +1143,15 @@
     const inputTextSize = document.getElementById('inputTextSize');
     const btnTextBold = document.getElementById('btnTextBold');
     const btnTextItalic = document.getElementById('btnTextItalic');
+    const btnTextUnderline = document.getElementById('btnTextUnderline');
+    const btnTextStrikethrough = document.getElementById('btnTextStrikethrough');
+    const btnAlignLeft = document.getElementById('btnAlignLeft');
+    const btnAlignCenter = document.getElementById('btnAlignCenter');
+    const btnAlignRight = document.getElementById('btnAlignRight');
+    const btnAlignJustify = document.getElementById('btnAlignJustify');
+    const inputTextLineHeight = document.getElementById('inputTextLineHeight');
+    const selectTextListStyle = document.getElementById('selectTextListStyle');
     const inputTextWidth = document.getElementById('inputTextWidth');
-    const selectTextAlign = document.getElementById('selectTextAlign');
     const inputPropRotation = document.getElementById('inputPropRotation');
     const lblPropRotationVal = document.getElementById('lblPropRotationVal');
     const inputPropRotationNum = document.getElementById('inputPropRotationNum');
@@ -1532,26 +1615,48 @@
       inputTextSize.addEventListener('input', (e) => {
         updateSelectedElement('fontSize', parseInt(e.target.value) || 16);
       });
-      btnTextBold.addEventListener('click', () => {
+      const toggleTextStyle = (property, btn) => {
         const el = elements[selectedElementIndex];
         if (el && el.type === 'text') {
-          updateSelectedElement('bold', !el.bold);
-          btnTextBold.style.backgroundColor = el.bold ? 'var(--accent-dim)' : 'var(--surface-card)';
+          const newVal = !el[property];
+          updateSelectedElement(property, newVal);
+          btn.classList.toggle('active', newVal);
         }
+      };
+
+      btnTextBold.addEventListener('click', () => toggleTextStyle('bold', btnTextBold));
+      btnTextItalic.addEventListener('click', () => toggleTextStyle('italic', btnTextItalic));
+      btnTextUnderline.addEventListener('click', () => toggleTextStyle('underline', btnTextUnderline));
+      btnTextStrikethrough.addEventListener('click', () => toggleTextStyle('strikethrough', btnTextStrikethrough));
+
+      const setTextAlign = (alignVal) => {
+        const el = elements[selectedElementIndex];
+        if (el && el.type === 'text') {
+          updateSelectedElement('textAlign', alignVal);
+          
+          btnAlignLeft.classList.toggle('active', alignVal === 'left');
+          btnAlignCenter.classList.toggle('active', alignVal === 'center');
+          btnAlignRight.classList.toggle('active', alignVal === 'right');
+          btnAlignJustify.classList.toggle('active', alignVal === 'justify');
+        }
+      };
+
+      btnAlignLeft.addEventListener('click', () => setTextAlign('left'));
+      btnAlignCenter.addEventListener('click', () => setTextAlign('center'));
+      btnAlignRight.addEventListener('click', () => setTextAlign('right'));
+      btnAlignJustify.addEventListener('click', () => setTextAlign('justify'));
+
+      inputTextLineHeight.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value) || 1.2;
+        updateSelectedElement('lineHeightMultiplier', val);
       });
-      btnTextItalic.addEventListener('click', () => {
-        const el = elements[selectedElementIndex];
-        if (el && el.type === 'text') {
-          updateSelectedElement('italic', !el.italic);
-          btnTextItalic.style.backgroundColor = el.italic ? 'var(--accent-dim)' : 'var(--surface-card)';
-        }
+
+      selectTextListStyle.addEventListener('change', (e) => {
+        updateSelectedElement('listStyle', e.target.value);
       });
 
       inputTextWidth.addEventListener('input', (e) => {
         updateSelectedElement('width', parseInt(e.target.value) || 20);
-      });
-      selectTextAlign.addEventListener('change', (e) => {
-        updateSelectedElement('textAlign', e.target.value);
       });
       function applyRotation(val) {
         val = Math.max(0, Math.min(360, val));
@@ -2022,9 +2127,13 @@
         el.fontFamily = 'Inter';
         el.bold = false;
         el.italic = false;
+        el.underline = false;
+        el.strikethrough = false;
         el.width = 250;
         el.height = 35;
         el.textAlign = 'center';
+        el.lineHeightMultiplier = 1.2;
+        el.listStyle = 'none';
       } else if (type === 'qrcode') {
         el.content = 'https://google.com';
         el.width = 80;
@@ -2164,7 +2273,11 @@
       textarea.style.fontWeight = el.bold ? 'bold' : 'normal';
       textarea.style.fontStyle = el.italic ? 'italic' : 'normal';
       textarea.style.textAlign = el.textAlign || 'center';
-      textarea.style.lineHeight = '1.2';
+      const decorations = [];
+      if (el.underline) decorations.push('underline');
+      if (el.strikethrough) decorations.push('line-through');
+      textarea.style.textDecoration = decorations.join(' ') || 'none';
+      textarea.style.lineHeight = el.lineHeightMultiplier || '1.2';
       
       textarea.style.border = '1px dashed var(--accent)';
       textarea.style.outline = 'none';
@@ -2244,6 +2357,11 @@
       activeInlineTextarea.style.fontWeight = el.bold ? 'bold' : 'normal';
       activeInlineTextarea.style.fontStyle = el.italic ? 'italic' : 'normal';
       activeInlineTextarea.style.textAlign = el.textAlign || 'center';
+      const decorations = [];
+      if (el.underline) decorations.push('underline');
+      if (el.strikethrough) decorations.push('line-through');
+      activeInlineTextarea.style.textDecoration = decorations.join(' ') || 'none';
+      activeInlineTextarea.style.lineHeight = el.lineHeightMultiplier || '1.2';
       
       activeInlineTextarea.style.transform = `rotate(${el.rotation || 0}deg)`;
     }
@@ -2551,9 +2669,20 @@
         selectTextFont.value = el.fontFamily || 'Inter';
         inputTextSize.value = el.fontSize || 24;
         inputTextWidth.value = el.width || 250;
-        selectTextAlign.value = el.textAlign || 'center';
-        btnTextBold.style.backgroundColor = el.bold ? 'var(--accent-dim)' : 'var(--surface-card)';
-        btnTextItalic.style.backgroundColor = el.italic ? 'var(--accent-dim)' : 'var(--surface-card)';
+        
+        btnTextBold.classList.toggle('active', !!el.bold);
+        btnTextItalic.classList.toggle('active', !!el.italic);
+        btnTextUnderline.classList.toggle('active', !!el.underline);
+        btnTextStrikethrough.classList.toggle('active', !!el.strikethrough);
+
+        const align = el.textAlign || 'center';
+        btnAlignLeft.classList.toggle('active', align === 'left');
+        btnAlignCenter.classList.toggle('active', align === 'center');
+        btnAlignRight.classList.toggle('active', align === 'right');
+        btnAlignJustify.classList.toggle('active', align === 'justify');
+
+        inputTextLineHeight.value = el.lineHeightMultiplier !== undefined ? el.lineHeightMultiplier : 1.2;
+        selectTextListStyle.value = el.listStyle || 'none';
       } else if (el.type === 'image') {
         propSectionImage.classList.remove('hidden');
         selectDithering.value = el.dithering || 'atkinson';
@@ -2866,23 +2995,49 @@
           const paragraphs = text.split('\n');
           let lines = [];
           
-          paragraphs.forEach(para => {
+          const lineHeight = el.fontSize * (el.lineHeightMultiplier || 1.2);
+          
+          paragraphs.forEach((para, paraIdx) => {
+            let prefix = '';
+            if (el.listStyle === 'bullet') {
+              prefix = '• ';
+            } else if (el.listStyle === 'checkbox') {
+              prefix = '☐ ';
+            } else if (el.listStyle === 'checkbox-checked') {
+              prefix = '☑ ';
+            } else if (el.listStyle === 'numbered') {
+              prefix = `${paraIdx + 1}. `;
+            }
+            
+            const prefixWidth = prefix ? ctx.measureText(prefix).width : 0;
             const words = para.split(' ');
-            let line = '';
+            
+            let line = prefix;
+            let firstLine = true;
+            let paraLines = [];
+            
             for (let n = 0; n < words.length; n++) {
-              let testLine = line + words[n] + ' ';
-              let metrics = ctx.measureText(testLine);
-              if (metrics.width > el.width && n > 0) {
-                lines.push(line.trim());
-                line = words[n] + ' ';
+              const word = words[n];
+              const testLine = line + (line === prefix ? '' : ' ') + word;
+              const limitWidth = firstLine ? el.width : (el.width - prefixWidth);
+              
+              const metrics = ctx.measureText(testLine);
+              if (metrics.width > limitWidth && n > 0 && line !== prefix) {
+                paraLines.push({ text: line, indent: firstLine ? 0 : prefixWidth });
+                line = word;
+                firstLine = false;
               } else {
                 line = testLine;
               }
             }
-            lines.push(line.trim());
+            paraLines.push({ text: line, indent: firstLine ? 0 : prefixWidth });
+            
+            // Mark the last line of this paragraph
+            paraLines[paraLines.length - 1].isLastOfParagraph = true;
+            
+            lines.push(...paraLines);
           });
 
-          const lineHeight = el.fontSize * 1.2;
           el.height = Math.max(15, Math.round(lines.length * lineHeight));
 
           if (el.isEditing) {
@@ -2890,30 +3045,39 @@
             return;
           }
 
-          lines.forEach((line, idx) => {
+          lines.forEach((lineObj, idx) => {
+            const line = lineObj.text;
+            const lineIndent = lineObj.indent || 0;
             let lineY = el.y + idx * lineHeight;
-            let lineX = el.x;
+            let lineX = el.x + lineIndent;
 
             const metrics = ctx.measureText(line);
+            
             if (el.textAlign === 'center') {
-              lineX = el.x + (el.width - metrics.width) / 2;
+              lineX = el.x + lineIndent + (el.width - lineIndent - metrics.width) / 2;
             } else if (el.textAlign === 'right') {
               lineX = el.x + el.width - metrics.width;
-            } else if (el.textAlign === 'justify' && idx < lines.length - 1) {
+            } else if (el.textAlign === 'justify' && !lineObj.isLastOfParagraph) {
               const wordsInLine = line.split(' ');
               if (wordsInLine.length > 1) {
                 const totalWordsWidth = wordsInLine.reduce((sum, word) => sum + ctx.measureText(word).width, 0);
-                const extraSpace = el.width - totalWordsWidth;
+                const remainingWidth = el.width - lineIndent;
+                const extraSpace = remainingWidth - totalWordsWidth;
                 const spaceWidth = extraSpace / (wordsInLine.length - 1);
-                let currentX = el.x;
+                
+                let currentX = el.x + lineIndent;
                 wordsInLine.forEach((word) => {
                   ctx.fillText(word, currentX, lineY);
                   currentX += ctx.measureText(word).width + spaceWidth;
                 });
+                
+                drawTextDecorations(ctx, el, el.x + lineIndent, lineY, remainingWidth);
                 return; // handled
               }
             }
+            
             ctx.fillText(line, lineX, lineY);
+            drawTextDecorations(ctx, el, lineX, lineY, metrics.width);
           });
           
         } else if (el.type === 'image' && el.imageObj) {
@@ -4234,6 +4398,25 @@
         ctx.setLineDash([2, 4]);
       } else {
         ctx.setLineDash([]);
+      }
+    }
+
+    function drawTextDecorations(ctx, el, x, y, width) {
+      if (el.underline) {
+        ctx.strokeStyle = ctx.fillStyle;
+        ctx.lineWidth = Math.max(1, el.fontSize / 15);
+        ctx.beginPath();
+        ctx.moveTo(x, y + el.fontSize * 1.05);
+        ctx.lineTo(x + width, y + el.fontSize * 1.05);
+        ctx.stroke();
+      }
+      if (el.strikethrough) {
+        ctx.strokeStyle = ctx.fillStyle;
+        ctx.lineWidth = Math.max(1, el.fontSize / 15);
+        ctx.beginPath();
+        ctx.moveTo(x, y + el.fontSize * 0.55);
+        ctx.lineTo(x + width, y + el.fontSize * 0.55);
+        ctx.stroke();
       }
     }
 
