@@ -472,6 +472,16 @@
       background-color: var(--accent-dim);
     }
 
+    .layer-item.dragging {
+      opacity: 0.4;
+      border: 1px dashed var(--accent);
+    }
+
+    .layer-item.drag-over {
+      border: 2px dashed var(--accent);
+      background-color: var(--accent-dim);
+    }
+
     .layer-item-info {
       display: flex;
       align-items: center;
@@ -1059,7 +1069,7 @@
 
   <script>
     // Constants & Configuration
-    const APP_VERSION = 'v1.0.39';
+    const APP_VERSION = 'v1.0.40';
     const DPI = 300;
     const MM_TO_INCH = 25.4;
     const PIXEL_RATIO = DPI / MM_TO_INCH; // dots per mm (approx 11.81 dots/mm)
@@ -3430,6 +3440,49 @@
           </div>
         `;
 
+        // Make item draggable
+        item.draggable = true;
+
+        item.addEventListener('dragstart', (e) => {
+          e.dataTransfer.setData('text/plain', i);
+          item.classList.add('dragging');
+          e.dataTransfer.effectAllowed = 'move';
+        });
+
+        item.addEventListener('dragend', () => {
+          item.classList.remove('dragging');
+          const overItems = layersListContainer.querySelectorAll('.layer-item');
+          overItems.forEach(x => x.classList.remove('drag-over'));
+        });
+
+        item.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          item.classList.add('drag-over');
+        });
+
+        item.addEventListener('dragleave', () => {
+          item.classList.remove('drag-over');
+        });
+
+        item.addEventListener('drop', (e) => {
+          e.preventDefault();
+          item.classList.remove('drag-over');
+          
+          const sourceIndex = parseInt(e.dataTransfer.getData('text/plain'));
+          if (isNaN(sourceIndex) || sourceIndex === i) return;
+          
+          // Reorder elements
+          const draggedEl = elements[sourceIndex];
+          elements.splice(sourceIndex, 1);
+          elements.splice(i, 0, draggedEl);
+          
+          selectedElementIndex = i;
+          renderLayersList();
+          render();
+          pushHistory();
+        });
+
         // Click to select
         item.addEventListener('click', (e) => {
           if (e.target.classList.contains('delete-btn')) {
@@ -4518,11 +4571,22 @@
       ctx.lineWidth = strokeWidth;
       
       if (style === 'sketch') {
-        // Fusain (Charcoal / Sketchy multi-pass)
-        for (let i = 0; i < 3; i++) {
+        // Fusain (Charcoal / Sketchy multi-pass with translation & rotation jitter)
+        const passes = 4;
+        const jitter = Math.max(1.8, strokeWidth * 0.25);
+        const centerX = el.x + (el.width || 0) / 2;
+        const centerY = el.y + (el.height || 0) / 2;
+        
+        for (let i = 0; i < passes; i++) {
           ctx.save();
-          ctx.translate((Math.random() - 0.5) * 1.5, (Math.random() - 0.5) * 1.5);
-          ctx.lineWidth = Math.max(1, strokeWidth * 0.6);
+          // Perturb position
+          ctx.translate((Math.random() - 0.5) * jitter, (Math.random() - 0.5) * jitter);
+          // Perturb rotation around center
+          ctx.translate(centerX, centerY);
+          ctx.rotate((Math.random() - 0.5) * 0.025);
+          ctx.translate(-centerX, -centerY);
+          
+          ctx.lineWidth = Math.max(0.8, strokeWidth * (0.4 + Math.random() * 0.4));
           drawGeometry();
           ctx.stroke();
           ctx.restore();
