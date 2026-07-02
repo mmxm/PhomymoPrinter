@@ -928,6 +928,7 @@
                 <option value="floyd">Floyd-Steinberg</option>
                 <option value="stucki">Stucki (Photo nette)</option>
                 <option value="halftone">Trame Journal (Demi-teinte)</option>
+                <option value="none">Niveaux de Gris (Simple)</option>
                 <option value="threshold">Seuil Simple (Binaire)</option>
               </select>
             </div>
@@ -1096,7 +1097,7 @@
 
   <script>
     // Constants & Configuration
-    const APP_VERSION = 'v1.0.43';
+    const APP_VERSION = 'v1.0.44';
     const DPI = 300;
     const MM_TO_INCH = 25.4;
     const PIXEL_RATIO = DPI / MM_TO_INCH; // dots per mm (approx 11.81 dots/mm)
@@ -3757,8 +3758,58 @@
             }
           }
         }
+      } else if (ditheringMode === 'stucki') {
+        // Stucki Dithering
+        for (let y = 0; y < height; y++) {
+          for (let x = 0; x < width; x++) {
+            const idx = y * width + x;
+            const oldVal = grayscale[idx];
+            const newVal = oldVal < 128 ? 0 : 255;
+            mono[idx] = newVal === 0 ? 1 : 0;
+            const err = oldVal - newVal;
+            
+            const e = err / 42;
+            // Row 0
+            if (x + 1 < width) grayscale[idx + 1] += e * 8;
+            if (x + 2 < width) grayscale[idx + 2] += e * 4;
+            // Row 1
+            if (y + 1 < height) {
+              const r1 = idx + width;
+              if (x - 2 >= 0) grayscale[r1 - 2] += e * 2;
+              if (x - 1 >= 0) grayscale[r1 - 1] += e * 4;
+              grayscale[r1] += e * 8;
+              if (x + 1 < width) grayscale[r1 + 1] += e * 4;
+              if (x + 2 < width) grayscale[r1 + 2] += e * 2;
+            }
+            // Row 2
+            if (y + 2 < height) {
+              const r2 = idx + width * 2;
+              if (x - 2 >= 0) grayscale[r2 - 2] += e * 1;
+              if (x - 1 >= 0) grayscale[r2 - 1] += e * 2;
+              grayscale[r2] += e * 4;
+              if (x + 1 < width) grayscale[r2 + 1] += e * 2;
+              if (x + 2 < width) grayscale[r2 + 2] += e * 1;
+            }
+          }
+        }
+      } else if (ditheringMode === 'halftone') {
+        // Halftone screen Dithering
+        const cellSize = 5;
+        const angle = 45 * Math.PI / 180;
+        const cosA = Math.cos(angle);
+        const sinA = Math.sin(angle);
+        for (let y = 0; y < height; y++) {
+          for (let x = 0; x < width; x++) {
+            const idx = y * width + x;
+            const rotX = x * cosA - y * sinA;
+            const rotY = x * sinA + y * cosA;
+            const screenVal = (Math.cos(rotX * (Math.PI / (cellSize / 2))) * Math.sin(rotY * (Math.PI / (cellSize / 2))) + 1) / 2;
+            const threshold = 10 + 235 * screenVal;
+            mono[idx] = grayscale[idx] < threshold ? 1 : 0;
+          }
+        }
       } else {
-        // Atkinson Dithering (Default)
+        // Atkinson Dithering (Default & None fallback)
         for (let y = 0; y < height; y++) {
           for (let x = 0; x < width; x++) {
             const idx = y * width + x;
@@ -4909,7 +4960,11 @@
         const ditheringMode = el.dithering || 'atkinson';
         const thresholdVal = el.threshold !== undefined ? el.threshold : 128;
 
-        if (ditheringMode === 'threshold') {
+        if (ditheringMode === 'none') {
+          for (let i = 0; i < grayscale.length; i++) {
+            dithered[i] = Math.max(0, Math.min(255, Math.round(grayscale[i])));
+          }
+        } else if (ditheringMode === 'threshold') {
           for (let i = 0; i < grayscale.length; i++) {
             dithered[i] = grayscale[i] < thresholdVal ? 0 : 255;
           }
