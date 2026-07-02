@@ -926,6 +926,8 @@
               <select id="selectDithering">
                 <option value="atkinson" selected>Atkinson (Recommandé)</option>
                 <option value="floyd">Floyd-Steinberg</option>
+                <option value="stucki">Stucki (Photo nette)</option>
+                <option value="halftone">Trame Journal (Demi-teinte)</option>
                 <option value="threshold">Seuil Simple (Binaire)</option>
               </select>
             </div>
@@ -1080,7 +1082,7 @@
 
   <script>
     // Constants & Configuration
-    const APP_VERSION = 'v1.0.41';
+    const APP_VERSION = 'v1.0.42';
     const DPI = 300;
     const MM_TO_INCH = 25.4;
     const PIXEL_RATIO = DPI / MM_TO_INCH; // dots per mm (approx 11.81 dots/mm)
@@ -1294,6 +1296,9 @@
 
       // 4. Attach event listeners
       setupEventListeners();
+
+      // 5. Automatic connection if already paired M02S device is found
+      autoConnectPrepairedDevice();
     });
 
     // Helper functions for settings storage
@@ -2227,6 +2232,36 @@
         console.log("Connecté à l'imprimante : " + printerDevice.name);
       } catch (err) {
         console.error("Échec de connexion automatique Bluetooth:", err);
+        onPrinterDisconnected();
+      }
+    }
+
+    async function autoConnectPrepairedDevice() {
+      if (!navigator.bluetooth || !navigator.bluetooth.getDevices) return;
+      try {
+        const devices = await navigator.bluetooth.getDevices();
+        const device = devices.find(d => d.name && (d.name.includes('M02S') || d.name.includes('Phomemo')));
+        if (device) {
+          console.log("Appareil déjà appairé trouvé au démarrage. Connexion automatique...");
+          statusText.textContent = "Reconnexion...";
+          statusDot.className = "status-dot connecting";
+          
+          printerDevice = device;
+          printerDevice.addEventListener('gattserverdisconnected', onPrinterDisconnected);
+          
+          const server = await printerDevice.gatt.connect();
+          const service = await server.getPrimaryService(0xFF00);
+          printerCharacteristic = await service.getCharacteristic(0xFF02);
+          
+          statusText.textContent = printerDevice.name || "Phomemo M02S";
+          statusDot.className = "status-dot connected";
+          btnConnect.querySelector('span').textContent = "Déconnecter";
+          btnConnect.classList.remove('primary');
+          btnPrint.disabled = false;
+          console.log("Connecté automatiquement au démarrage !");
+        }
+      } catch (err) {
+        console.warn("Échec de la reconnexion automatique au démarrage:", err);
         onPrinterDisconnected();
       }
     }
@@ -4826,7 +4861,68 @@
               }
             }
           }
+        } else if (ditheringMode === 'stucki') {
+          const tempGray = new Float32Array(grayscale);
+          for (let y = 0; y < sourceH; y++) {
+            for (let x = 0; x < sourceW; x++) {
+              const idx = y * sourceW + x;
+              const oldVal = tempGray[idx];
+              const newVal = oldVal < 128 ? 0 : 255;
+              dithered[idx] = newVal;
+              const err = oldVal - newVal;
+
+              const e = err / 42;
+              
+              // Row 0
+              if (x + 1 < sourceW) tempGray[idx + 1] += e * 8;
+              if (x + 2 < sourceW) tempGray[idx + 2] += e * 4;
+              
+              // Row 1
+              if (y + 1 < sourceH) {
+                const r1 = idx + sourceW;
+                if (x - 2 >= 0) tempGray[r1 - 2] += e * 2;
+                if (x - 1 >= 0) tempGray[r1 - 1] += e * 4;
+                tempGray[r1] += e * 8;
+                if (x + 1 < sourceW) tempGray[r1 + 1] += e * 4;
+                if (x + 2 < sourceW) tempGray[r1 + 2] += e * 2;
+              }
+              
+              // Row 2
+              if (y + 2 < sourceH) {
+                const r2 = idx + sourceW * 2;
+                if (x - 2 >= 0) tempGray[r2 - 2] += e * 1;
+                if (x - 1 >= 0) tempGray[r2 - 1] += e * 2;
+                tempGray[r2] += e * 4;
+                if (x + 1 < sourceW) tempGray[r2 + 1] += e * 2;
+                if (x + 2 < sourceW) tempGray[r2 + 2] += e * 1;
+              }
+            }
+          }
+        } else if (ditheringMode === 'halftone') {
+          // Halftoning with angled sine/cosine screen
+          const cellSize = 5;
+          const angle = 45 * Math.PI / 180;
+          const cosA = Math.cos(angle);
+          const sinA = Math.sin(angle);
+          
+          for (let y = 0; y < sourceH; y++) {
+            for (let x = 0; x < sourceW; x++) {
+              const idx = y * sourceW + x;
+              const grayVal = grayscale[idx];
+              
+              // Rotate coordinates
+              const rotX = x * cosA - y * sinA;
+              const rotY = x * sinA + y * cosA;
+              
+              // Screen function
+              const screenVal = (Math.cos(rotX * (Math.PI / (cellSize / 2))) * Math.sin(rotY * (Math.PI / (cellSize / 2))) + 1) / 2;
+              const threshold = 10 + 235 * screenVal;
+              
+              dithered[idx] = grayVal < threshold ? 0 : 255;
+            }
+          }
         } else {
+          // Atkinson dithering (default)
           const tempGray = new Float32Array(grayscale);
           for (let y = 0; y < sourceH; y++) {
             for (let x = 0; x < sourceW; x++) {
