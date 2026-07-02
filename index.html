@@ -971,6 +971,10 @@
                   <option value="dashed-medium">╌ Tirets</option>
                   <option value="dashed-long">╍ Tirets longs</option>
                   <option value="dotted">● ● Points ronds</option>
+                  <option value="sketch">✍ Fusain</option>
+                  <option value="calligraphy">✒ Calligraphie</option>
+                  <option value="chalk">🖍 Craie</option>
+                  <option value="drybrush">🖌 Pinceau sec</option>
                 </select>
                 <div style="display: flex; align-items: center; width: 85px; position: relative;">
                   <input type="number" id="inputStrokeWidth" min="1" max="30" value="2" style="text-align: center; padding-right: 1.5rem;">
@@ -1055,7 +1059,7 @@
 
   <script>
     // Constants & Configuration
-    const APP_VERSION = 'v1.0.38';
+    const APP_VERSION = 'v1.0.39';
     const DPI = 300;
     const MM_TO_INCH = 25.4;
     const PIXEL_RATIO = DPI / MM_TO_INCH; // dots per mm (approx 11.81 dots/mm)
@@ -3231,72 +3235,63 @@
             ctx.fillText('Barcode Error', el.x + 5, el.y + 15);
           }
         } else if (el.type === 'rectangle' || el.type === 'roundrect') {
-          ctx.strokeStyle = '#000000';
           const strokeWidth = el.strokeWidth !== undefined ? el.strokeWidth : 2;
-          ctx.lineWidth = strokeWidth;
-          applyLineDash(ctx, el.lineDash, strokeWidth);
-          
-          ctx.beginPath();
           const r = el.borderRadius !== undefined ? el.borderRadius : (el.type === 'roundrect' ? 10 : 0);
-          ctx.roundRect(el.x, el.y, el.width, el.height, r);
+          
           if (el.fill && el.fill !== 'transparent') {
             ctx.fillStyle = getFillColor(el.fill);
+            ctx.beginPath();
+            ctx.roundRect(el.x, el.y, el.width, el.height, r);
             ctx.fill();
           }
-          if (el.borderType !== 'none') {
-            ctx.stroke();
-          }
-          ctx.setLineDash([]);
-          ctx.lineCap = 'butt';
+          
+          drawCustomStroke(ctx, el, strokeWidth, () => {
+            ctx.beginPath();
+            ctx.roundRect(el.x, el.y, el.width, el.height, r);
+          });
         } else if (el.type === 'circle') {
-          ctx.strokeStyle = '#000000';
           const strokeWidth = el.strokeWidth !== undefined ? el.strokeWidth : 2;
-          ctx.lineWidth = strokeWidth;
-          applyLineDash(ctx, el.lineDash, strokeWidth);
           const r = el.width / 2;
-          ctx.beginPath();
-          ctx.arc(el.x + r, el.y + r, Math.max(1, r - strokeWidth/2), 0, Math.PI * 2);
+          
           if (el.fill && el.fill !== 'transparent') {
             ctx.fillStyle = getFillColor(el.fill);
+            ctx.beginPath();
+            ctx.arc(el.x + r, el.y + r, Math.max(1, r - strokeWidth/2), 0, Math.PI * 2);
             ctx.fill();
           }
-          if (el.borderType !== 'none') {
-            ctx.stroke();
-          }
-          ctx.setLineDash([]);
-          ctx.lineCap = 'butt';
+          
+          drawCustomStroke(ctx, el, strokeWidth, () => {
+            ctx.beginPath();
+            ctx.arc(el.x + r, el.y + r, Math.max(1, r - strokeWidth/2), 0, Math.PI * 2);
+          });
         } else if (el.type === 'triangle') {
-          ctx.strokeStyle = '#000000';
           const strokeWidth = el.strokeWidth !== undefined ? el.strokeWidth : 2;
-          ctx.lineWidth = strokeWidth;
-          applyLineDash(ctx, el.lineDash, strokeWidth);
-          ctx.beginPath();
-          ctx.moveTo(el.x + el.width / 2, el.y);
-          ctx.lineTo(el.x + el.width, el.y + el.height);
-          ctx.lineTo(el.x, el.y + el.height);
-          ctx.closePath();
+          
           if (el.fill && el.fill !== 'transparent') {
             ctx.fillStyle = getFillColor(el.fill);
+            ctx.beginPath();
+            ctx.moveTo(el.x + el.width / 2, el.y);
+            ctx.lineTo(el.x + el.width, el.y + el.height);
+            ctx.lineTo(el.x, el.y + el.height);
+            ctx.closePath();
             ctx.fill();
           }
-          if (el.borderType !== 'none') {
-            ctx.stroke();
-          }
-          ctx.setLineDash([]);
-          ctx.lineCap = 'butt';
+          
+          drawCustomStroke(ctx, el, strokeWidth, () => {
+            ctx.beginPath();
+            ctx.moveTo(el.x + el.width / 2, el.y);
+            ctx.lineTo(el.x + el.width, el.y + el.height);
+            ctx.lineTo(el.x, el.y + el.height);
+            ctx.closePath();
+          });
         } else if (el.type === 'line') {
-          ctx.strokeStyle = '#000000';
           const strokeWidth = el.strokeWidth !== undefined ? el.strokeWidth : 3;
-          ctx.lineWidth = strokeWidth;
-          applyLineDash(ctx, el.lineDash, strokeWidth);
-          ctx.beginPath();
-          ctx.moveTo(el.x, el.y + el.height/2);
-          ctx.lineTo(el.x + el.width, el.y + el.height/2);
-          if (el.borderType !== 'none') {
-            ctx.stroke();
-          }
-          ctx.setLineDash([]);
-          ctx.lineCap = 'butt';
+          
+          drawCustomStroke(ctx, el, strokeWidth, () => {
+            ctx.beginPath();
+            ctx.moveTo(el.x, el.y + el.height/2);
+            ctx.lineTo(el.x + el.width, el.y + el.height/2);
+          });
         }
 
         ctx.restore();
@@ -4512,6 +4507,67 @@
         ctx.setLineDash([0, lw * 2.5]);
       } else {
         ctx.setLineDash([]);
+      }
+    }
+
+    function drawCustomStroke(ctx, el, strokeWidth, drawGeometry) {
+      if (el.borderType === 'none') return;
+      
+      const style = el.lineDash || 'solid';
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = strokeWidth;
+      
+      if (style === 'sketch') {
+        // Fusain (Charcoal / Sketchy multi-pass)
+        for (let i = 0; i < 3; i++) {
+          ctx.save();
+          ctx.translate((Math.random() - 0.5) * 1.5, (Math.random() - 0.5) * 1.5);
+          ctx.lineWidth = Math.max(1, strokeWidth * 0.6);
+          drawGeometry();
+          ctx.stroke();
+          ctx.restore();
+        }
+      } else if (style === 'calligraphy') {
+        // Calligraphie (Ribbon stroke along 45 degrees)
+        const step = Math.max(0.5, strokeWidth / 6);
+        for (let i = -strokeWidth/2; i <= strokeWidth/2; i += step) {
+          ctx.save();
+          ctx.translate(i * 0.7, i * 0.7);
+          ctx.lineWidth = Math.max(0.8, strokeWidth * 0.25);
+          drawGeometry();
+          ctx.stroke();
+          ctx.restore();
+        }
+      } else if (style === 'chalk') {
+        // Craie (Grainy / Dusty scatter)
+        for (let i = 0; i < 2; i++) {
+          ctx.save();
+          ctx.translate((Math.random() - 0.5) * 1.0, (Math.random() - 0.5) * 1.0);
+          ctx.lineWidth = Math.max(1, strokeWidth * 0.85);
+          ctx.setLineDash([1 + Math.random() * 2, 2 + Math.random() * 3]);
+          drawGeometry();
+          ctx.stroke();
+          ctx.restore();
+        }
+      } else if (style === 'drybrush') {
+        // Pinceau sec (Streaky parallel bristles)
+        const step = Math.max(1.0, strokeWidth / 4);
+        for (let i = -strokeWidth/2; i <= strokeWidth/2; i += step) {
+          ctx.save();
+          ctx.translate((Math.random() - 0.5) * 0.8, i);
+          ctx.lineWidth = Math.max(0.8, strokeWidth * 0.2);
+          ctx.setLineDash([10 + Math.random() * 15, 4 + Math.random() * 6]);
+          drawGeometry();
+          ctx.stroke();
+          ctx.restore();
+        }
+      } else {
+        // Standard styles (solid, dashed, dotted)
+        applyLineDash(ctx, style, strokeWidth);
+        drawGeometry();
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.lineCap = 'butt';
       }
     }
 
