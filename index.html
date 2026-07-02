@@ -477,9 +477,14 @@
       border: 1px dashed var(--accent);
     }
 
-    .layer-item.drag-over {
-      border: 2px dashed var(--accent);
-      background-color: var(--accent-dim);
+    .layer-item.drag-insert-above {
+      border-top: 3px solid var(--accent) !important;
+      margin-top: -2px;
+    }
+
+    .layer-item.drag-insert-below {
+      border-bottom: 3px solid var(--accent) !important;
+      margin-bottom: -2px;
     }
 
     .layer-item-info {
@@ -583,6 +588,12 @@
         <div id="statusDot" class="status-dot"></div>
         <span id="statusText" class="status-text">Non connecté</span>
       </div>
+      <button id="btnConnectAuto" class="secondary" title="Recherche automatique et connexion directe">
+        <svg style="width: 16px; height: 16px; fill: currentColor;" viewBox="0 0 24 24">
+          <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14zm2.5-4h-2v-2H9v2H7v1h2v2h1v-2h2v-1z"/>
+        </svg>
+        <span>Recherche M02S</span>
+      </button>
       <button id="btnConnect" class="primary">
         <svg style="width: 16px; height: 16px; fill: currentColor;" viewBox="0 0 24 24">
           <path d="M17.71 7.71L12 2h-1v7.59L6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 11 14.41V22h1l5.71-5.71-4.3-4.29 4.3-4.29zM13 5.83l1.88 1.88L13 9.59V5.83zm1.88 10.29L13 18.17v-3.76l1.88 1.88z"/>
@@ -1069,7 +1080,7 @@
 
   <script>
     // Constants & Configuration
-    const APP_VERSION = 'v1.0.40';
+    const APP_VERSION = 'v1.0.41';
     const DPI = 300;
     const MM_TO_INCH = 25.4;
     const PIXEL_RATIO = DPI / MM_TO_INCH; // dots per mm (approx 11.81 dots/mm)
@@ -1140,6 +1151,7 @@
     const fixedHeightGroup = document.getElementById('fixedHeightGroup');
     const inputLabelHeight = document.getElementById('inputLabelHeight');
     const btnConnect = document.getElementById('btnConnect');
+    const btnConnectAuto = document.getElementById('btnConnectAuto');
     const btnPrint = document.getElementById('btnPrint');
     const statusDot = document.getElementById('statusDot');
     const statusText = document.getElementById('statusText');
@@ -1625,6 +1637,7 @@
       });
 
       // Connect Bluetooth Device
+      btnConnectAuto.addEventListener('click', connectPrinterAuto);
       btnConnect.addEventListener('click', connectPrinter);
 
       // Print Button
@@ -2159,6 +2172,61 @@
         }
       } catch (err) {
         console.error("Échec de connexion Bluetooth:", err);
+        onPrinterDisconnected();
+      }
+    }
+
+    async function connectPrinterAuto() {
+      if (printerDevice && printerDevice.gatt.connected) {
+        onPrinterDisconnected();
+        return;
+      }
+
+      statusText.textContent = "Recherche M02S...";
+      statusDot.className = "status-dot connecting";
+      
+      try {
+        let device = null;
+        
+        // 1. Try to get already permitted devices (supported in Chrome/Mac)
+        if (navigator.bluetooth && navigator.bluetooth.getDevices) {
+          const devices = await navigator.bluetooth.getDevices();
+          device = devices.find(d => d.name && (d.name.includes('M02S') || d.name.includes('Phomemo')));
+          if (device) {
+            console.log("Appareil déjà appairé trouvé, reconnexion...", device.name);
+          }
+        }
+        
+        // 2. If not found, pop dialog directly filtering for M02S
+        if (!device) {
+          device = await navigator.bluetooth.requestDevice({
+            filters: [
+              { namePrefix: 'M02S' },
+              { namePrefix: 'M02' },
+              { namePrefix: 'Phomemo' }
+            ],
+            optionalServices: [0xFF00]
+          });
+        }
+        
+        printerDevice = device;
+        printerDevice.addEventListener('gattserverdisconnected', onPrinterDisconnected);
+
+        statusText.textContent = "Connexion...";
+        const server = await printerDevice.gatt.connect();
+        
+        const service = await server.getPrimaryService(0xFF00);
+        printerCharacteristic = await service.getCharacteristic(0xFF02);
+
+        statusText.textContent = printerDevice.name || "Phomemo M02S";
+        statusDot.className = "status-dot connected";
+        btnConnect.querySelector('span').textContent = "Déconnecter";
+        btnConnect.classList.remove('primary');
+        btnPrint.disabled = false;
+        
+        console.log("Connecté à l'imprimante : " + printerDevice.name);
+      } catch (err) {
+        console.error("Échec de connexion automatique Bluetooth:", err);
         onPrinterDisconnected();
       }
     }
@@ -3452,32 +3520,57 @@
         item.addEventListener('dragend', () => {
           item.classList.remove('dragging');
           const overItems = layersListContainer.querySelectorAll('.layer-item');
-          overItems.forEach(x => x.classList.remove('drag-over'));
+          overItems.forEach(x => x.classList.remove('drag-insert-above', 'drag-insert-below'));
         });
 
         item.addEventListener('dragover', (e) => {
           e.preventDefault();
           e.dataTransfer.dropEffect = 'move';
-          item.classList.add('drag-over');
+          
+          const rect = item.getBoundingClientRect();
+          const mouseY = e.clientY - rect.top;
+          const isTopHalf = mouseY < rect.height / 2;
+          
+          const overItems = layersListContainer.querySelectorAll('.layer-item');
+          overItems.forEach(x => {
+            if (x !== item) x.classList.remove('drag-insert-above', 'drag-insert-below');
+          });
+
+          if (isTopHalf) {
+            item.classList.add('drag-insert-above');
+            item.classList.remove('drag-insert-below');
+          } else {
+            item.classList.add('drag-insert-below');
+            item.classList.remove('drag-insert-above');
+          }
         });
 
         item.addEventListener('dragleave', () => {
-          item.classList.remove('drag-over');
+          item.classList.remove('drag-insert-above', 'drag-insert-below');
         });
 
         item.addEventListener('drop', (e) => {
           e.preventDefault();
-          item.classList.remove('drag-over');
+          const isTopHalf = item.classList.contains('drag-insert-above');
+          item.classList.remove('drag-insert-above', 'drag-insert-below');
           
           const sourceIndex = parseInt(e.dataTransfer.getData('text/plain'));
           if (isNaN(sourceIndex) || sourceIndex === i) return;
           
-          // Reorder elements
           const draggedEl = elements[sourceIndex];
           elements.splice(sourceIndex, 1);
-          elements.splice(i, 0, draggedEl);
           
-          selectedElementIndex = i;
+          let insertIndex = i;
+          if (sourceIndex < i) {
+            insertIndex = isTopHalf ? i : i - 1;
+          } else {
+            insertIndex = isTopHalf ? i + 1 : i;
+          }
+          
+          insertIndex = Math.max(0, Math.min(elements.length, insertIndex));
+          elements.splice(insertIndex, 0, draggedEl);
+          
+          selectedElementIndex = insertIndex;
           renderLayersList();
           render();
           pushHistory();
